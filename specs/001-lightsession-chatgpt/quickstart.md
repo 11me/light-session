@@ -169,7 +169,9 @@ Create `extension/manifest.json`:
     }
   ],
   "background": {
-    "scripts": ["dist/background/background.js"]
+    "scripts": ["dist/background/background.js"],
+    "service_worker": "dist/background/background.js",
+    "preferred_environment": ["service_worker", "document"]
   },
   "browser_specific_settings": {
     "gecko": {

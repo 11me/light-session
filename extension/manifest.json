@@ -29,7 +29,9 @@
     }
   ],
   "background": {
-    "scripts": ["dist/background.js"]
+    "scripts": ["dist/background.js"],
+    "service_worker": "dist/background.js",
+    "preferred_environment": ["service_worker", "document"]
   },
   "web_accessible_resources": [
     {
