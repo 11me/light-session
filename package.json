@@ -11,8 +11,8 @@
     "lint:fix": "eslint extension/src --ext .ts --fix",
     "format": "prettier --write 'extension/src/**/*.ts'",
     "format:check": "prettier --check 'extension/src/**/*.ts'",
-    "dev": "npm run build && web-ext run --source-dir=extension --firefox=firefoxdeveloperedition --start-url='https://chat.openai.com'",
-    "dev:stable": "npm run build && web-ext run --source-dir=extension --firefox=firefox --start-url='https://chat.openai.com'",
+    "dev": "npm run build && web-ext run --source-dir=extension --firefox=firefoxdeveloperedition --pref extensions.backgroundServiceWorker.enabled=true --start-url='https://chat.openai.com'",
+    "dev:stable": "npm run build && web-ext run --source-dir=extension --firefox=firefox --pref extensions.backgroundServiceWorker.enabled=true --start-url='https://chat.openai.com'",
     "package": "npm run build:prod && web-ext build --source-dir=extension --artifacts-dir=web-ext-artifacts",
     "clean": "rm -rf extension/dist extension/popup/popup.js web-ext-artifacts"
   },

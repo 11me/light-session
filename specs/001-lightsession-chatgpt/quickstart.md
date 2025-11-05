@@ -169,12 +169,12 @@ Create `extension/manifest.json`:
     }
   ],
   "background": {
-    "scripts": ["dist/background/background.js"]
+    "service_worker": "dist/background/background.js"
   },
   "browser_specific_settings": {
     "gecko": {
       "id": "lightsession@example.com",
-      "strict_min_version": "115.0"
+      "strict_min_version": "128.0"
     }
   }
 }
@@ -195,8 +195,8 @@ Update `package.json` scripts section:
     "lint:fix": "eslint extension/src --ext .ts --fix",
     "format": "prettier --write 'extension/src/**/*.ts'",
     "format:check": "prettier --check 'extension/src/**/*.ts'",
-    "dev": "web-ext run --source-dir=extension --firefox=firefoxdeveloperedition --start-url='https://chat.openai.com'",
-    "dev:stable": "web-ext run --source-dir=extension --firefox=firefox --start-url='https://chat.openai.com'",
+    "dev": "web-ext run --source-dir=extension --firefox=firefoxdeveloperedition --pref extensions.backgroundServiceWorker.enabled=true --start-url='https://chat.openai.com'",
+    "dev:stable": "web-ext run --source-dir=extension --firefox=firefox --pref extensions.backgroundServiceWorker.enabled=true --start-url='https://chat.openai.com'",
     "package": "npm run build && web-ext build --source-dir=extension --artifacts-dir=web-ext-artifacts",
     "clean": "rm -rf extension/dist web-ext-artifacts"
   }
