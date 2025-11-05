@@ -1,10 +1,10 @@
 # Dependencies
 node_modules/
 
-# Build outputs
+# Build outputs - compiled TypeScript files
 extension/dist/
-*.js
-*.js.map
+extension/popup/*.js
+extension/popup/*.js.map
 *.d.ts
 *.d.ts.map
 
@@ -12,6 +12,10 @@ extension/dist/
 web-ext-artifacts/
 *.xpi
 *.zip
+
+# But keep these important JS files
+!build.js
+!.eslintrc.json
 
 # IDEs
 .vscode/
