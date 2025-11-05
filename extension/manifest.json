@@ -29,7 +29,7 @@
     }
   ],
   "background": {
-    "service_worker": "dist/background.js"
+    "scripts": ["dist/background.js"]
   },
   "web_accessible_resources": [
     {
@@ -40,7 +40,7 @@
   "browser_specific_settings": {
     "gecko": {
       "id": "lightsession@example.com",
-      "strict_min_version": "128.0",
+      "strict_min_version": "115.0",
       "data_collection_permissions": {
         "required": ["none"]
       }
