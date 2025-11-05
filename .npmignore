@@ -1,0 +1,27 @@
+# Source files (only ship dist)
+extension/src/
+
+# Development files
+.git/
+.github/
+.vscode/
+.idea/
+*.swp
+*~
+
+# Specs and documentation (keep README)
+specs/
+tests/
+*.md
+!README.md
+
+# Config files
+.eslintrc.json
+.prettierrc
+tsconfig.json
+
+# Dependencies
+node_modules/
+
+# Logs
+*.log

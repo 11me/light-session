@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LightSession Settings</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>LightSession</h1>
+      <p class="subtitle">ChatGPT Performance Optimizer</p>
+    </header>
+
+    <main>
+      <!-- Enable/Disable Toggle -->
+      <div class="setting-group">
+        <label class="toggle-container">
+          <input type="checkbox" id="enableToggle" aria-label="Enable extension">
+          <span class="toggle-slider"></span>
+          <span class="toggle-label">Extension Enabled</span>
+        </label>
+        <p class="setting-description">Toggle trimming on/off</p>
+      </div>
+
+      <!-- Message Retention Slider -->
+      <div class="setting-group">
+        <label for="keepSlider">
+          Keep last <strong id="keepValue">10</strong> messages
+        </label>
+        <input
+          type="range"
+          id="keepSlider"
+          min="1"
+          max="100"
+          value="10"
+          aria-label="Number of messages to keep"
+          aria-valuemin="1"
+          aria-valuemax="100"
+          aria-valuenow="10"
+        >
+        <div class="slider-labels">
+          <span>1</span>
+          <span>50</span>
+          <span>100</span>
+        </div>
+        <p class="setting-description">Adjust how many recent messages to display</p>
+      </div>
+
+      <!-- Preserve System/Tool Messages -->
+      <div class="setting-group">
+        <label class="checkbox-container">
+          <input type="checkbox" id="preserveSystemCheckbox" aria-label="Preserve system and tool messages">
+          <span class="checkbox-label">Preserve system/tool messages</span>
+        </label>
+        <p class="setting-description">Keep system and tool messages beyond normal limit</p>
+      </div>
+
+      <!-- Pause on Scroll Up -->
+      <div class="setting-group">
+        <label class="checkbox-container">
+          <input type="checkbox" id="pauseOnScrollUpCheckbox" aria-label="Pause when scrolled up">
+          <span class="checkbox-label">Pause when scrolled up</span>
+        </label>
+        <p class="setting-description">Stop trimming while reviewing older messages</p>
+      </div>
+
+      <!-- Debug Mode -->
+      <div class="setting-group">
+        <label class="checkbox-container">
+          <input type="checkbox" id="debugCheckbox" aria-label="Enable debug logging">
+          <span class="checkbox-label">Debug mode</span>
+        </label>
+        <p class="setting-description">Show debug logs in browser console</p>
+      </div>
+
+      <!-- Refresh Button -->
+      <div class="setting-group">
+        <button id="refreshButton" class="refresh-button">
+          Refresh to restore full history
+        </button>
+        <p class="setting-description">Reload ChatGPT page to see all messages</p>
+      </div>
+    </main>
+
+    <footer>
+      <div id="status" class="status" role="status" aria-live="polite"></div>
+    </footer>
+  </div>
+
+  <script src="../../dist/popup/popup.js"></script>
+</body>
+</html>

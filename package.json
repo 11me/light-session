@@ -1,0 +1,38 @@
+{
+  "name": "light-session",
+  "version": "1.0.0",
+  "description": "LightSession for ChatGPT - Firefox extension to optimize long conversation performance",
+  "scripts": {
+    "build": "node build.js",
+    "build:types": "tsc --noEmit",
+    "build:prod": "rm -f extension/.dev && node build.js",
+    "watch": "node build.js --watch",
+    "lint": "eslint extension/src --ext .ts",
+    "lint:fix": "eslint extension/src --ext .ts --fix",
+    "format": "prettier --write 'extension/src/**/*.ts'",
+    "format:check": "prettier --check 'extension/src/**/*.ts'",
+    "dev": "npm run build && web-ext run --source-dir=extension --firefox=firefoxdeveloperedition --start-url='https://chat.openai.com'",
+    "dev:stable": "npm run build && web-ext run --source-dir=extension --firefox=firefox --start-url='https://chat.openai.com'",
+    "package": "npm run build:prod && web-ext build --source-dir=extension --artifacts-dir=web-ext-artifacts",
+    "clean": "rm -rf extension/dist extension/popup/popup.js web-ext-artifacts"
+  },
+  "keywords": [
+    "firefox",
+    "extension",
+    "chatgpt",
+    "performance",
+    "webextension"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/firefox-webext-browser": "^120.0.5",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
+    "esbuild": "^0.25.12",
+    "eslint": "^8.57.1",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.3",
+    "web-ext": "^7.12.0"
+  }
+}

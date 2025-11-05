@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+extension/dist/
+*.js
+*.js.map
+*.d.ts
+*.d.ts.map
+
+# Extension artifacts
+web-ext-artifacts/
+*.xpi
+*.zip
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.local
+.env*.local
+
+# Development mode marker
+extension/.dev
+
+# Temporary
+*.tmp
+*.temp
