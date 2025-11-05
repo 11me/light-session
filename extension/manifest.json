@@ -29,7 +29,7 @@
     }
   ],
   "background": {
-    "scripts": ["dist/background.js"]
+    "service_worker": "dist/background.js"
   },
   "web_accessible_resources": [
     {

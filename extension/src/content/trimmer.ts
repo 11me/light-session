@@ -155,14 +155,12 @@ export function evaluateTrim(state: TrimmerState): TrimmerState {
     return { ...state, current: 'OBSERVING', trimScheduled: false };
   }
 
-  // Determine which nodes to remove
-  const toRemove = nodes.slice(0, overflow).filter((n) => {
-    // If preservation enabled, exclude system/tool messages
-    if (state.settings.preserveSystem && (n.role === 'system' || n.role === 'tool')) {
-      return false;
-    }
-    return true;
-  });
+  // Determine which nodes to remove, skipping preserved roles before slicing
+  const removableNodes = state.settings.preserveSystem
+    ? nodes.filter((n) => n.role !== 'system' && n.role !== 'tool')
+    : nodes;
+
+  const toRemove = removableNodes.slice(0, overflow);
 
   if (toRemove.length === 0) {
     logDebug('Trim evaluation skipped: No removable nodes after preservation filter');
