@@ -23,8 +23,8 @@
     "performance",
     "webextension"
   ],
-  "author": "",
-  "license": "ISC",
+  "author": "LightSession Contributors",
+  "license": "MIT",
   "devDependencies": {
     "@types/firefox-webext-browser": "^120.0.5",
     "@typescript-eslint/eslint-plugin": "^6.21.0",
