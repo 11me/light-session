@@ -27,7 +27,14 @@ export function detectRole(el: HTMLElement): MsgRole {
   if (/assistant|model|ai/.test(author)) return 'assistant';
   if (/user|you/.test(author)) return 'user';
 
-  // Priority 2: Structural/content-based indicators
+  // Priority 2: conversation-turn data attributes
+  const turnAttr = el.dataset.turn?.toLowerCase();
+  if (turnAttr === 'user') return 'user';
+  if (turnAttr === 'assistant') return 'assistant';
+  if (turnAttr === 'system') return 'system';
+  if (turnAttr === 'tool') return 'tool';
+
+  // Priority 3: Structural/content-based indicators
   if (el.querySelector('[data-testid*="tool" i], [data-tool-call-id]')) {
     return 'tool';
   }
@@ -36,7 +43,7 @@ export function detectRole(el: HTMLElement): MsgRole {
     return 'assistant';
   }
 
-  // Priority 3: ARIA roles
+  // Priority 4: ARIA roles
   const role = el.getAttribute('role');
   if (role === 'status' || role === 'log' || role === 'alert') {
     return 'system';
@@ -152,7 +159,7 @@ export function findScrollableAncestor(el: HTMLElement): HTMLElement | null {
 export function buildActiveThread(): NodeInfo[] {
   const { nodes, tier } = collectCandidates();
 
-  if (!tier || nodes.length < DOM.MIN_CANDIDATES) {
+  if (nodes.length < DOM.MIN_CANDIDATES) {
     logDebug(`buildActiveThread: Not enough candidates (${nodes.length})`);
     return [];
   }

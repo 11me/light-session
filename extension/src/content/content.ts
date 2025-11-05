@@ -56,9 +56,9 @@ async function initialize(): Promise<void> {
 /**
  * Handle mutation events (debounced)
  */
-function handleMutation(): void {
+function handleMutation(force = false): void {
   state = scheduleTrim(state, () => {
-    state = evaluateTrim(state);
+    state = evaluateTrim(state, { force });
   });
 }
 
@@ -83,7 +83,8 @@ browser.storage.onChanged.addListener((changes, areaName) => {
   }
 
   // Handle enable/disable toggle
-  const wasEnabled = state.settings.enabled;
+  const previousSettings = state.settings;
+  const wasEnabled = previousSettings.enabled;
   const nowEnabled = newSettings.enabled;
 
   state.settings = newSettings;
@@ -118,7 +119,8 @@ browser.storage.onChanged.addListener((changes, areaName) => {
   } else if (nowEnabled) {
     // Extension still enabled, settings changed
     // Re-evaluate trim with new settings (e.g., keep count changed)
-    handleMutation();
+    const forceTrim = previousSettings.keep !== newSettings.keep;
+    handleMutation(forceTrim);
   }
 });
 

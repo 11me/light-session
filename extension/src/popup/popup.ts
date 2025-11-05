@@ -15,8 +15,60 @@ let debugGroup: HTMLElement;
 let refreshButton: HTMLButtonElement;
 let statusElement: HTMLElement;
 
-// Debounce timeout for slider
+// Debounce/throttle state for slider persistence
 let sliderDebounceTimeout: number | null = null;
+let pendingKeepValue: number | null = null;
+let lastKeepUpdateTimestamp = 0;
+const SLIDER_SAVE_THROTTLE_MS = 150;
+
+/**
+ * Schedule updating the keep setting with optional immediate flush
+ */
+function scheduleKeepUpdate(value: number, immediate: boolean = false): void {
+  if (immediate) {
+    if (sliderDebounceTimeout !== null) {
+      clearTimeout(sliderDebounceTimeout);
+      sliderDebounceTimeout = null;
+    }
+    pendingKeepValue = null;
+    lastKeepUpdateTimestamp = performance.now();
+    void updateSettings({ keep: value });
+    return;
+  }
+
+  const now = performance.now();
+
+  // If enough time elapsed since last write, update immediately
+  if (now - lastKeepUpdateTimestamp >= SLIDER_SAVE_THROTTLE_MS) {
+    if (sliderDebounceTimeout !== null) {
+      clearTimeout(sliderDebounceTimeout);
+      sliderDebounceTimeout = null;
+    }
+    pendingKeepValue = null;
+    lastKeepUpdateTimestamp = now;
+    void updateSettings({ keep: value }, { silent: true });
+    return;
+  }
+
+  pendingKeepValue = value;
+
+  if (sliderDebounceTimeout !== null) {
+    clearTimeout(sliderDebounceTimeout);
+  }
+
+  const wait = Math.max(0, SLIDER_SAVE_THROTTLE_MS - (now - lastKeepUpdateTimestamp));
+  sliderDebounceTimeout = window.setTimeout(() => {
+    sliderDebounceTimeout = null;
+    if (pendingKeepValue === null) {
+      return;
+    }
+
+    lastKeepUpdateTimestamp = performance.now();
+    const latestValue = pendingKeepValue;
+    pendingKeepValue = null;
+    void updateSettings({ keep: latestValue }, { silent: true });
+  }, wait);
+}
 
 /**
  * Check if running in development mode
@@ -95,14 +147,19 @@ async function loadSettings(): Promise<void> {
 /**
  * Update settings in background script
  */
-async function updateSettings(updates: Partial<Omit<LsSettings, 'version'>>): Promise<void> {
+async function updateSettings(
+  updates: Partial<Omit<LsSettings, 'version'>>,
+  options: { silent?: boolean } = {}
+): Promise<void> {
   try {
     await sendMessageWithTimeout({
       type: 'SET_SETTINGS',
       payload: updates,
     });
 
-    showStatus('Settings saved');
+    if (!options.silent) {
+      showStatus('Settings saved');
+    }
   } catch (error) {
     showStatus('Failed to save settings', true);
     console.error('Failed to update settings:', error);
@@ -125,6 +182,7 @@ function handleKeepSliderInput(): void {
   const value = parseInt(keepSlider.value, 10);
   keepValue.textContent = value.toString();
   keepSlider.setAttribute('aria-valuenow', value.toString());
+  scheduleKeepUpdate(value);
 }
 
 /**
@@ -132,16 +190,7 @@ function handleKeepSliderInput(): void {
  */
 function handleKeepSliderChange(): void {
   const value = parseInt(keepSlider.value, 10);
-
-  // Debounce the save operation
-  if (sliderDebounceTimeout !== null) {
-    clearTimeout(sliderDebounceTimeout);
-  }
-
-  sliderDebounceTimeout = window.setTimeout(() => {
-    updateSettings({ keep: value });
-    sliderDebounceTimeout = null;
-  }, 300);
+  scheduleKeepUpdate(value, true);
 }
 
 /**

@@ -43,6 +43,33 @@ export function collectCandidates(): { nodes: HTMLElement[]; tier: SelectorTierN
     );
   }
 
+  // Fallback: probe for data-testid based ChatGPT DOM patterns (post 2024 UI)
+  const fallbackSelectors = [
+    '[data-testid="conversation-turn"]',
+    '[data-testid^="conversation-turn-"]',
+    '[data-testid="assistant-turn"]',
+    '[data-testid="user-turn"]',
+    'div[class*="conversation-turn" i] article',
+    'section[aria-label*="chat history" i] article'
+  ];
+
+  const fallbackNodes = [
+    ...new Set(
+      fallbackSelectors.flatMap((selector) =>
+        Array.from(document.querySelectorAll<HTMLElement>(selector))
+      )
+    ),
+  ].filter(isLikelyMessage);
+
+  if (fallbackNodes.length >= DOM.MIN_CANDIDATES) {
+    logDebug(
+      'Fallback selectors succeeded: ' +
+        fallbackNodes.length +
+        ' candidates using data-testid heuristics'
+    );
+    return { nodes: fallbackNodes, tier: null };
+  }
+
   logWarn('All selector tiers failed to find valid candidates');
   return { nodes: [], tier: null };
 }
@@ -52,6 +79,11 @@ export function collectCandidates(): { nodes: HTMLElement[]; tier: SelectorTierN
  * Used primarily for Tier C filtering
  */
 function isLikelyMessage(el: HTMLElement): boolean {
+  // Fast path: ChatGPT conversation containers expose data-turn with roles
+  if (el.dataset.turn) {
+    return isVisible(el);
+  }
+
   // Must be visible (basic check)
   if (!isVisible(el)) {
     return false;

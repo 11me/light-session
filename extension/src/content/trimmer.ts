@@ -111,7 +111,7 @@ export function calculateKeepCount(nodes: NodeInfo[], settings: LsSettings): num
  * Evaluate trim: Check preconditions and execute if met
  * PENDING_TRIM → TRIMMING or back to OBSERVING
  */
-export function evaluateTrim(state: TrimmerState): TrimmerState {
+export function evaluateTrim(state: TrimmerState, options: { force?: boolean } = {}): TrimmerState {
   logDebug('=== evaluateTrim called ===');
   logDebug(`Settings: enabled=${state.settings.enabled}, keep=${state.settings.keep}, preserveSystem=${state.settings.preserveSystem}`);
 
@@ -122,7 +122,7 @@ export function evaluateTrim(state: TrimmerState): TrimmerState {
   }
 
   // Precondition 2: Not scrolled up (if pauseOnScrollUp enabled)
-  if (state.settings.pauseOnScrollUp && !state.isAtBottom) {
+  if (!options.force && state.settings.pauseOnScrollUp && !state.isAtBottom) {
     logDebug('Trim evaluation skipped: Scrolled up');
     return { ...state, current: 'OBSERVING', trimScheduled: false };
   }

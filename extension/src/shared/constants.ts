@@ -62,7 +62,7 @@ export const DOM = {
    * Minimum valid message nodes to proceed with trim
    * Fail-safe: < 6 messages = abort
    */
-  MIN_CANDIDATES: 6,
+  MIN_CANDIDATES: 2,
 
   /**
    * Threshold for isAtBottom detection (px)
@@ -93,17 +93,35 @@ export const DOM = {
 export const SELECTOR_TIERS: Readonly<SelectorTier[]> = [
   {
     name: 'A',
-    description: 'Current UI (data attributes)',
-    selectors: ['[data-message-id]', 'article[data-message-id]', '[data-message-author]'],
+    description: 'Conversation turn containers',
+    selectors: [
+      '[data-message-id]',
+      'article[data-message-id]',
+      '[data-message-author]',
+      '[data-message-author-role]',
+      '[data-turn]',
+      '[data-testid=conversation-turn]',
+      '[data-testid^=conversation-turn-]',
+      '[data-testid=assistant-turn]',
+      '[data-testid=user-turn]'
+    ],
     minCandidates: DOM.MIN_CANDIDATES,
   },
   {
     name: 'B',
-    description: 'Fallback (test IDs and roles)',
+    description: 'Semantic fallbacks (roles + test IDs)',
     selectors: [
+      '[data-testid="conversation-turn"]',
+      '[data-testid^="conversation-turn-"]',
+      '[data-testid="assistant-turn"]',
+      '[data-testid="user-turn"]',
       '[data-testid*="message" i]',
-      'article[role="article"] [data-testid*="content" i]',
+      '[data-turn]',
+      'article[role="article"]',
       'div[role="article"]',
+      'section[aria-label*="chat history" i] article',
+      'ol[role="list"] > li[role="listitem"] article',
+      'div[class*="conversation-turn" i]',
     ],
     minCandidates: DOM.MIN_CANDIDATES,
   },
