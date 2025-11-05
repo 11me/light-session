@@ -42,7 +42,7 @@
       "id": "lightsession@example.com",
       "strict_min_version": "115.0",
       "data_collection_permissions": {
-        "required": false
+        "required": ["none"]
       }
     }
   }
