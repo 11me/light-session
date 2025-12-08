@@ -5,7 +5,8 @@
 
 // Polyfill for requestIdleCallback
 if (typeof requestIdleCallback === 'undefined') {
-  (window as any).requestIdleCallback = (callback: IdleRequestCallback, options?: IdleRequestOptions) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+  (window as any).requestIdleCallback = (callback: IdleRequestCallback, _options?: IdleRequestOptions) => {
     const start = Date.now();
     return setTimeout(() => {
       callback({
@@ -17,6 +18,7 @@ if (typeof requestIdleCallback === 'undefined') {
 }
 
 if (typeof cancelIdleCallback === 'undefined') {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
   (window as any).cancelIdleCallback = (id: number) => {
     clearTimeout(id);
   };

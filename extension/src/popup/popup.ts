@@ -117,7 +117,7 @@ async function initialize(): Promise<void> {
   if (debugCheckbox) {
     debugCheckbox.addEventListener('change', handleDebugToggle);
   }
-  refreshButton.addEventListener('click', handleRefreshClick);
+  refreshButton.addEventListener('click', () => void handleRefreshClick());
 }
 
 /**
@@ -179,7 +179,7 @@ async function updateSettings(
  */
 function handleEnableToggle(): void {
   const enabled = enableToggle.checked;
-  updateSettings({ enabled });
+  void updateSettings({ enabled });
   updateDisabledState(enabled);
 }
 
@@ -205,14 +205,14 @@ function handleKeepSliderChange(): void {
  * Handle show status bar toggle
  */
 function handleShowStatusBarToggle(): void {
-  updateSettings({ showStatusBar: showStatusBarCheckbox.checked });
+  void updateSettings({ showStatusBar: showStatusBarCheckbox.checked });
 }
 
 /**
  * Handle debug mode toggle
  */
 function handleDebugToggle(): void {
-  updateSettings({ debug: debugCheckbox.checked });
+  void updateSettings({ debug: debugCheckbox.checked });
 }
 
 /**
@@ -278,7 +278,7 @@ function updateDisabledState(enabled: boolean): void {
 
 // Initialize when DOM is ready
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initialize);
+  document.addEventListener('DOMContentLoaded', () => void initialize());
 } else {
-  initialize();
+  void initialize();
 }

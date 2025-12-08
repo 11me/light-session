@@ -98,7 +98,7 @@ export function calculateKeepCount(settings: LsSettings): number {
  * Evaluate trim: Check preconditions and execute if met
  * PENDING_TRIM → TRIMMING or back to OBSERVING
  */
-export function evaluateTrim(state: TrimmerState, options: { force?: boolean } = {}): TrimmerState {
+export function evaluateTrim(state: TrimmerState, _options: { force?: boolean } = {}): TrimmerState {
   logDebug('=== evaluateTrim called ===');
   logDebug(`Settings: enabled=${state.settings.enabled}, keep=${state.settings.keep}`);
 
