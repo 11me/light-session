@@ -52,8 +52,8 @@ const messageHandler = createMessageHandler(
       }
 
       default: {
-        const unknownMessage = message as any;
-        throw new Error(`Unknown message type: ${unknownMessage.type}`);
+        const _exhaustiveCheck: never = message;
+        throw new Error(`Unknown message type: ${(_exhaustiveCheck as RuntimeMessage).type}`);
       }
     }
   }
@@ -64,8 +64,8 @@ const messageHandler = createMessageHandler(
  */
 browser.storage.onChanged.addListener((changes, areaName) => {
   if (areaName === 'local' && changes.ls_settings) {
-    const newSettings = changes.ls_settings.newValue;
-    if (newSettings && 'debug' in newSettings) {
+    const newSettings = changes.ls_settings.newValue as Record<string, unknown> | undefined;
+    if (newSettings && typeof newSettings.debug === 'boolean') {
       setDebugMode(newSettings.debug);
       logDebug('Debug mode updated from storage change');
     }
@@ -73,7 +73,8 @@ browser.storage.onChanged.addListener((changes, areaName) => {
 });
 
 // Register message listener
-// Cast to any to work around Firefox WebExtensions type mismatch
+// Cast needed to work around Firefox WebExtensions type mismatch
+// eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
 browser.runtime.onMessage.addListener(messageHandler as any);
 
 // Initialize on script load

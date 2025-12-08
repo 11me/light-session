@@ -5,7 +5,7 @@
 
 import '../shared/browser-polyfill';
 import '../shared/idle-callback-polyfill';
-import type { TrimmerState } from '../shared/types';
+import type { TrimmerState, LsSettings } from '../shared/types';
 import { loadSettings } from '../shared/storage';
 import { setDebugMode, logInfo, logError } from '../shared/logger';
 import { findConversationRoot } from './dom-helpers';
@@ -32,7 +32,7 @@ function requestRootSync(reason: string): void {
 
   pendingRootSync = true;
 
-  Promise.resolve().then(() => {
+  void Promise.resolve().then(() => {
     pendingRootSync = false;
     const effectiveReason = pendingRootSyncReason || 'mutation';
     pendingRootSyncReason = null;
@@ -164,7 +164,7 @@ function installNavigationWatcher(onChange: (reason: string) => void): () => voi
   let lastUrl = window.location.href;
 
   const scheduleCheck = (reason: string) => {
-    Promise.resolve().then(() => {
+    void Promise.resolve().then(() => {
       const current = window.location.href;
       if (current === lastUrl) {
         return;
@@ -181,13 +181,13 @@ function installNavigationWatcher(onChange: (reason: string) => void): () => voi
   window.addEventListener('popstate', handlePopState);
   window.addEventListener('hashchange', handleHashChange);
 
-  const originalPushState = history.pushState;
-  const originalReplaceState = history.replaceState;
+  const originalPushState = history.pushState.bind(history);
+  const originalReplaceState = history.replaceState.bind(history);
 
   history.pushState = function (
     ...args: Parameters<typeof originalPushState>
   ): ReturnType<typeof originalPushState> {
-    const result = originalPushState.apply(this, args);
+    const result = originalPushState(...args);
     scheduleCheck('pushstate');
     return result;
   };
@@ -195,7 +195,7 @@ function installNavigationWatcher(onChange: (reason: string) => void): () => voi
   history.replaceState = function (
     ...args: Parameters<typeof originalReplaceState>
   ): ReturnType<typeof originalReplaceState> {
-    const result = originalReplaceState.apply(this, args);
+    const result = originalReplaceState(...args);
     scheduleCheck('replacestate');
     return result;
   };
@@ -264,7 +264,7 @@ browser.storage.onChanged.addListener((changes, areaName) => {
     return;
   }
 
-  const newSettings = changes.ls_settings.newValue;
+  const newSettings = changes.ls_settings.newValue as LsSettings | undefined;
   if (!newSettings) {
     return;
   }
@@ -272,9 +272,7 @@ browser.storage.onChanged.addListener((changes, areaName) => {
   logInfo('Settings changed, updating state');
 
   // Update debug mode
-  if ('debug' in newSettings) {
-    setDebugMode(newSettings.debug);
-  }
+  setDebugMode(newSettings.debug);
 
   // Handle enable/disable toggle
   const previousSettings = state.settings;

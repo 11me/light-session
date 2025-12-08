@@ -11,24 +11,27 @@ let debugEnabled = false;
  * Safe console wrapper that won't throw if console is unavailable
  */
 const safeConsole = {
-  log: (...args: any[]) => {
+  log: (...args: unknown[]) => {
     try {
-      console?.log?.(...args);
-    } catch (e) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+      console?.log?.(...(args as Parameters<typeof console.log>));
+    } catch {
       // Silently fail if console is unavailable
     }
   },
-  warn: (...args: any[]) => {
+  warn: (...args: unknown[]) => {
     try {
-      console?.warn?.(...args);
-    } catch (e) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+      console?.warn?.(...(args as Parameters<typeof console.warn>));
+    } catch {
       // Silently fail if console is unavailable
     }
   },
-  error: (...args: any[]) => {
+  error: (...args: unknown[]) => {
     try {
-      console?.error?.(...args);
-    } catch (e) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+      console?.error?.(...(args as Parameters<typeof console.error>));
+    } catch {
       // Silently fail if console is unavailable
     }
   },
@@ -51,7 +54,7 @@ export function isDebugMode(): boolean {
 /**
  * Log debug message (only if debug mode enabled)
  */
-export function logDebug(message: string, ...args: any[]): void {
+export function logDebug(message: string, ...args: unknown[]): void {
   if (debugEnabled) {
     safeConsole.log(`${LOG_PREFIX} [DEBUG]`, message, ...args);
   }
@@ -60,20 +63,20 @@ export function logDebug(message: string, ...args: any[]): void {
 /**
  * Log warning (always shown)
  */
-export function logWarn(message: string, ...args: any[]): void {
+export function logWarn(message: string, ...args: unknown[]): void {
   safeConsole.warn(`${LOG_PREFIX} [WARN]`, message, ...args);
 }
 
 /**
  * Log error (always shown)
  */
-export function logError(message: string, ...args: any[]): void {
+export function logError(message: string, ...args: unknown[]): void {
   safeConsole.error(`${LOG_PREFIX} [ERROR]`, message, ...args);
 }
 
 /**
  * Log info (always shown)
  */
-export function logInfo(message: string, ...args: any[]): void {
+export function logInfo(message: string, ...args: unknown[]): void {
   safeConsole.log(`${LOG_PREFIX} [INFO]`, message, ...args);
 }
