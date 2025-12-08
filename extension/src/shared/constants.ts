@@ -158,3 +158,9 @@ export const VALIDATION = {
    */
   MAX_KEEP: 100,
 } as const;
+
+// ============================================================================
+// External URLs
+// ============================================================================
+
+export const SUPPORT_URL = 'https://github.com/11me/light-session#support' as const;

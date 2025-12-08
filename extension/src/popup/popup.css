@@ -212,22 +212,64 @@ main {
   outline-offset: 2px;
 }
 
-/* Status Message */
+/* Footer */
 footer {
   margin-top: 12px;
-  padding-top: 12px;
+  padding-top: 10px;
   border-top: 1px solid #eee;
+  text-align: center;
 }
 
 .status {
   font-size: 12px;
-  text-align: center;
   min-height: 18px;
   color: #10a37f;
 }
 
+.status:empty {
+  display: none;
+}
+
 .status.error {
   color: #d9534f;
+}
+
+.ls-footer-support {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid #ddd;
+  background: transparent;
+  font-size: 11px;
+  color: #555;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ls-footer-heart {
+  filter: grayscale(0.3);
+}
+
+.ls-footer-support:hover {
+  background: rgba(16, 163, 127, 0.08);
+  border-color: #10a37f;
+  color: #10a37f;
+  transform: translateY(-1px);
+}
+
+.ls-footer-support:hover .ls-footer-heart {
+  filter: grayscale(0);
+}
+
+.ls-footer-support:active {
+  transform: translateY(0);
+}
+
+.ls-footer-support:focus {
+  outline: 2px solid #10a37f;
+  outline-offset: 2px;
 }
 
 /* Disabled State */

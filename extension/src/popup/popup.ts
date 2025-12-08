@@ -5,6 +5,7 @@
 
 import type { LsSettings } from '../shared/types';
 import { sendMessageWithTimeout } from '../shared/messages';
+import { SUPPORT_URL } from '../shared/constants';
 
 // UI Elements
 let enableToggle: HTMLInputElement;
@@ -15,6 +16,7 @@ let debugCheckbox: HTMLInputElement;
 let debugGroup: HTMLElement;
 let refreshButton: HTMLButtonElement;
 let statusElement: HTMLElement;
+let supportLink: HTMLButtonElement;
 
 // Debounce/throttle state for slider persistence
 let sliderDebounceTimeout: number | null = null;
@@ -118,6 +120,10 @@ async function initialize(): Promise<void> {
     debugCheckbox.addEventListener('change', handleDebugToggle);
   }
   refreshButton.addEventListener('click', () => void handleRefreshClick());
+
+  // Support link
+  supportLink = document.getElementById('supportLink') as HTMLButtonElement;
+  supportLink.addEventListener('click', handleSupportClick);
 }
 
 /**
@@ -244,6 +250,13 @@ async function handleRefreshClick(): Promise<void> {
     showStatus('Failed to refresh page', true);
     console.error('Failed to refresh:', error);
   }
+}
+
+/**
+ * Handle support button click
+ */
+function handleSupportClick(): void {
+  void browser.tabs.create({ url: SUPPORT_URL });
 }
 
 /**
