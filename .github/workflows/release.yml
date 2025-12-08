@@ -92,4 +92,4 @@ jobs:
           addon-path: light-session-${{ steps.version.outputs.VERSION }}.zip
           auth-api-issuer: ${{ secrets.FIREFOX_API_ISSUER }}
           auth-api-secret: ${{ secrets.FIREFOX_API_SECRET }}
-          release-notes: "See release notes at https://github.com/11me/light-session/releases/tag/v${{ steps.version.outputs.VERSION }}"
+          release-note: "See release notes at https://github.com/11me/light-session/releases/tag/v${{ steps.version.outputs.VERSION }}"
