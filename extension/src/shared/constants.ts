@@ -13,8 +13,7 @@ export const DEFAULT_SETTINGS: Readonly<LsSettings> = {
   version: 1,
   enabled: true,
   keep: 10,
-  preserveSystem: true,
-  pauseOnScrollUp: true,
+  showStatusBar: true,
   debug: false,
 } as const;
 

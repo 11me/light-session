@@ -10,6 +10,7 @@ import { sendMessageWithTimeout } from '../shared/messages';
 let enableToggle: HTMLInputElement;
 let keepSlider: HTMLInputElement;
 let keepValue: HTMLElement;
+let showStatusBarCheckbox: HTMLInputElement;
 let debugCheckbox: HTMLInputElement;
 let debugGroup: HTMLElement;
 let refreshButton: HTMLButtonElement;
@@ -91,6 +92,7 @@ async function initialize(): Promise<void> {
   enableToggle = document.getElementById('enableToggle') as HTMLInputElement;
   keepSlider = document.getElementById('keepSlider') as HTMLInputElement;
   keepValue = document.getElementById('keepValue') as HTMLElement;
+  showStatusBarCheckbox = document.getElementById('showStatusBarCheckbox') as HTMLInputElement;
   debugCheckbox = document.getElementById('debugCheckbox') as HTMLInputElement;
   debugGroup = document.getElementById('debugGroup') as HTMLElement;
   refreshButton = document.getElementById('refreshButton') as HTMLButtonElement;
@@ -109,6 +111,9 @@ async function initialize(): Promise<void> {
   enableToggle.addEventListener('change', handleEnableToggle);
   keepSlider.addEventListener('input', handleKeepSliderInput);
   keepSlider.addEventListener('change', handleKeepSliderChange);
+  if (showStatusBarCheckbox) {
+    showStatusBarCheckbox.addEventListener('change', handleShowStatusBarToggle);
+  }
   if (debugCheckbox) {
     debugCheckbox.addEventListener('change', handleDebugToggle);
   }
@@ -132,6 +137,9 @@ async function loadSettings(): Promise<void> {
     keepValue.textContent = settings.keep.toString();
     keepSlider.setAttribute('aria-valuenow', settings.keep.toString());
 
+    if (showStatusBarCheckbox) {
+      showStatusBarCheckbox.checked = settings.showStatusBar;
+    }
     if (debugCheckbox) {
       debugCheckbox.checked = settings.debug;
     }
@@ -191,6 +199,13 @@ function handleKeepSliderInput(): void {
 function handleKeepSliderChange(): void {
   const value = parseInt(keepSlider.value, 10);
   scheduleKeepUpdate(value, true);
+}
+
+/**
+ * Handle show status bar toggle
+ */
+function handleShowStatusBarToggle(): void {
+  updateSettings({ showStatusBar: showStatusBarCheckbox.checked });
 }
 
 /**

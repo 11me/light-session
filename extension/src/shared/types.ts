@@ -11,8 +11,7 @@ export interface LsSettings {
   version: 1; // Schema version for future migrations
   enabled: boolean; // Toggle trimming on/off
   keep: number; // Message retention limit (1-100)
-  preserveSystem: boolean; // Preserve system/tool messages beyond limit
-  pauseOnScrollUp: boolean; // Pause trimming when user scrolls up
+  showStatusBar: boolean; // Show in-page status bar with trimming stats
   debug: boolean; // Enable debug logging
 }
 
@@ -50,8 +49,6 @@ export interface TrimmerState {
   trimScheduled: boolean; // Debounce flag
   lastTrimTime: number; // performance.now() of last trim
   conversationRoot: HTMLElement | null;
-  scrollContainer: HTMLElement | null;
-  isAtBottom: boolean; // Scroll position tracking
   settings: LsSettings; // Cached settings (refreshed on storage change)
 }
 
