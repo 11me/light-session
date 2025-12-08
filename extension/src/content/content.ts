@@ -8,40 +8,16 @@ import '../shared/idle-callback-polyfill';
 import type { TrimmerState } from '../shared/types';
 import { loadSettings } from '../shared/storage';
 import { setDebugMode, logInfo, logError } from '../shared/logger';
-import { setupScrollTracking } from './observers';
 import { findConversationRoot } from './dom-helpers';
 import { createInitialState, boot, shutdown, scheduleTrim, evaluateTrim } from './trimmer';
+import { setStatusBarVisibility, removeStatusBar, resetAccumulatedTrimmed, showLayoutNotRecognized } from './status-bar';
 
 // Global state
 let state: TrimmerState = createInitialState();
-let scrollCleanup: (() => void) | null = null;
 let pageObserver: MutationObserver | null = null;
 let navigationCleanup: (() => void) | null = null;
 let pendingRootSync = false;
 let pendingRootSyncReason: string | null = null;
-
-/**
- * Attach scroll tracking to the current scroll container.
- * Replaces any existing listeners to avoid leaks after DOM swaps.
- */
-function attachScrollTracking(): void {
-  if (scrollCleanup) {
-    scrollCleanup();
-    scrollCleanup = null;
-  }
-
-  if (!state.scrollContainer) {
-    return;
-  }
-
-  scrollCleanup = setupScrollTracking(state.scrollContainer, (isAtBottom) => {
-    state.isAtBottom = isAtBottom;
-
-    if (isAtBottom && state.settings.pauseOnScrollUp) {
-      handleMutation();
-    }
-  });
-}
 
 /**
  * Schedule a root sync operation on the microtask queue.
@@ -83,23 +59,18 @@ function ensureConversationBindings(reason: string): void {
   const rootMissing = !currentRoot || !document.contains(currentRoot);
   const observerMissing = !state.observer;
   const rootChanged = Boolean(candidateRoot && currentRoot && candidateRoot !== currentRoot);
-  const scrollerMissing =
-    state.scrollContainer !== null && !document.contains(state.scrollContainer);
 
   if (candidateIsFallback) {
     if ((rootMissing || observerMissing) && (state.current !== 'IDLE' || state.observer || currentRoot)) {
       teardownTrimmer();
+      resetAccumulatedTrimmed(); // Reset stats so recovery starts fresh
+      showLayoutNotRecognized(); // Show warning when layout is not recognized
     }
     return;
   }
 
   if (rootMissing || observerMissing || rootChanged || state.current === 'IDLE') {
     rebindTrimmer(reason);
-    return;
-  }
-
-  if (scrollerMissing) {
-    attachScrollTracking();
   }
 }
 
@@ -107,11 +78,6 @@ function ensureConversationBindings(reason: string): void {
  * Clean up current trimmer bindings without disabling the feature.
  */
 function teardownTrimmer(): void {
-  if (scrollCleanup) {
-    scrollCleanup();
-    scrollCleanup = null;
-  }
-
   if (state.current !== 'IDLE' || state.observer || state.conversationRoot) {
     state = shutdown(state);
   }
@@ -123,9 +89,9 @@ function teardownTrimmer(): void {
 function rebindTrimmer(reason: string): void {
   logInfo(`Rebinding trimmer (${reason})`);
 
-  if (scrollCleanup) {
-    scrollCleanup();
-    scrollCleanup = null;
+  // Reset trimmed counter on navigation to new chat
+  if (reason.includes('state') || reason.includes('navigation') || reason === 'pushstate' || reason === 'popstate') {
+    resetAccumulatedTrimmed();
   }
 
   state = shutdown(state);
@@ -139,8 +105,6 @@ function rebindTrimmer(reason: string): void {
   if (state.current !== 'OBSERVING' || !state.conversationRoot) {
     return;
   }
-
-  attachScrollTracking();
 
   state = evaluateTrim(state, { force: true });
 }
@@ -262,7 +226,8 @@ async function initialize(): Promise<void> {
 
       state = boot(state, handleMutation);
 
-      attachScrollTracking();
+      // Initialize status bar visibility
+      setStatusBarVisibility(settings.showStatusBar);
 
       if (state.current === 'OBSERVING') {
         handleMutation();
@@ -271,6 +236,7 @@ async function initialize(): Promise<void> {
       }
     } else {
       stopRootSyncWatchers();
+      removeStatusBar();
     }
 
     logInfo('LightSession initialized successfully');
@@ -322,7 +288,7 @@ browser.storage.onChanged.addListener((changes, areaName) => {
     logInfo('Extension enabled, booting trimmer');
     startRootSyncWatchers();
     state = boot(state, handleMutation);
-    attachScrollTracking();
+    setStatusBarVisibility(newSettings.showStatusBar);
 
     if (state.current === 'OBSERVING') {
       handleMutation();
@@ -334,17 +300,24 @@ browser.storage.onChanged.addListener((changes, areaName) => {
     logInfo('Extension disabled, shutting down trimmer');
     stopRootSyncWatchers();
     teardownTrimmer();
+    removeStatusBar();
   } else if (nowEnabled) {
     // Extension still enabled, settings changed
     // Re-evaluate trim with new settings (e.g., keep count changed)
     const forceTrim = previousSettings.keep !== newSettings.keep;
-    attachScrollTracking();
+
+    // Handle showStatusBar setting change
+    if (previousSettings.showStatusBar !== newSettings.showStatusBar) {
+      setStatusBarVisibility(newSettings.showStatusBar);
+    }
+
     requestRootSync('settings-change');
     handleMutation(forceTrim);
   } else {
     // Remain disabled
     stopRootSyncWatchers();
     teardownTrimmer();
+    removeStatusBar();
   }
 });
 

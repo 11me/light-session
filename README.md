@@ -41,9 +41,8 @@ Built after too many coding sessions where a single ChatGPT tab would start eati
 
 **User experience**
 
-- **Configurable** – choose how many recent messages to keep
-- **Optional preservation** – keep system/tool messages beyond the normal limit
-- **Scroll-aware** – trimming pauses automatically while you scroll up to review history
+- **Configurable** – choose how many recent messages to keep (1–100)
+- **Status indicator** – optional on-page pill showing trim statistics
 - **Reversible** – refresh the page to restore the full conversation
 
 **Privacy**
@@ -106,10 +105,8 @@ When you want to see the full history again:
 ### Settings
 
 - **Extension enabled** – master on/off toggle.
-- **Keep last N messages** – how many messages remain visible in the DOM.
-- **Preserve system/tool messages** – keeps system & tool messages beyond the normal limit.
-- **Pause when scrolled up** – trimming stops while you're reading older parts of the conversation.
-- **Debug mode** – logs internal events to the console for troubleshooting.
+- **Keep last N messages** – how many messages remain visible in the DOM (1–100).
+- **Show status bar** – display a floating pill with trim statistics.
 - **Refresh** – reloads the page to restore all messages.
 
 ### Keyboard accessibility

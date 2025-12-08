@@ -21,8 +21,7 @@ export function validateSettings(input: Partial<LsSettings>): LsSettings {
       VALIDATION.MIN_KEEP,
       Math.min(VALIDATION.MAX_KEEP, input.keep ?? DEFAULT_SETTINGS.keep)
     ),
-    preserveSystem: input.preserveSystem ?? DEFAULT_SETTINGS.preserveSystem,
-    pauseOnScrollUp: input.pauseOnScrollUp ?? DEFAULT_SETTINGS.pauseOnScrollUp,
+    showStatusBar: input.showStatusBar ?? DEFAULT_SETTINGS.showStatusBar,
     debug: input.debug ?? DEFAULT_SETTINGS.debug,
   };
 }

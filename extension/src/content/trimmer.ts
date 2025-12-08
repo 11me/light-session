@@ -3,12 +3,13 @@
  * Core trimming logic with state management and batch execution
  */
 
-import type { TrimmerState, NodeInfo, LsSettings } from '../shared/types';
+import type { TrimmerState, LsSettings, NodeInfo } from '../shared/types';
 import { TIMING, DOM, DEFAULT_SETTINGS } from '../shared/constants';
 import { logDebug, logWarn, logInfo } from '../shared/logger';
-import { buildActiveThread, findConversationRoot, findScrollableAncestor } from './dom-helpers';
+import { buildActiveThread, findConversationRoot } from './dom-helpers';
 import { isStreaming } from './stream-detector';
 import { createDebouncedObserver } from './observers';
+import { updateStatusBar } from './status-bar';
 
 /**
  * Initial trimmer state
@@ -20,8 +21,6 @@ export function createInitialState(): TrimmerState {
     trimScheduled: false,
     lastTrimTime: 0,
     conversationRoot: null,
-    scrollContainer: null,
-    isAtBottom: true,
     settings: { ...DEFAULT_SETTINGS },
   };
 }
@@ -48,8 +47,6 @@ export function boot(state: TrimmerState, onMutation: () => void): TrimmerState 
     subtree: true,
   });
 
-  const scrollContainer = findScrollableAncestor(root);
-
   logInfo('Trimmer booted successfully');
 
   return {
@@ -57,7 +54,6 @@ export function boot(state: TrimmerState, onMutation: () => void): TrimmerState 
     current: 'OBSERVING',
     observer,
     conversationRoot: root,
-    scrollContainer,
   };
 }
 
@@ -93,18 +89,9 @@ export function scheduleTrim(state: TrimmerState, evaluateTrimCallback: () => vo
 
 /**
  * Calculate how many nodes to keep
- * Accounts for preservation of system/tool messages
  */
-export function calculateKeepCount(nodes: NodeInfo[], settings: LsSettings): number {
-  if (!settings.preserveSystem) {
-    return settings.keep;
-  }
-
-  // Count system/tool messages
-  const systemToolCount = nodes.filter((n) => n.role === 'system' || n.role === 'tool').length;
-
-  // Keep base + all system/tool messages
-  return settings.keep + systemToolCount;
+export function calculateKeepCount(settings: LsSettings): number {
+  return settings.keep;
 }
 
 /**
@@ -113,7 +100,7 @@ export function calculateKeepCount(nodes: NodeInfo[], settings: LsSettings): num
  */
 export function evaluateTrim(state: TrimmerState, options: { force?: boolean } = {}): TrimmerState {
   logDebug('=== evaluateTrim called ===');
-  logDebug(`Settings: enabled=${state.settings.enabled}, keep=${state.settings.keep}, preserveSystem=${state.settings.preserveSystem}`);
+  logDebug(`Settings: enabled=${state.settings.enabled}, keep=${state.settings.keep}`);
 
   // Precondition 1: Enabled
   if (!state.settings.enabled) {
@@ -121,13 +108,7 @@ export function evaluateTrim(state: TrimmerState, options: { force?: boolean } =
     return { ...state, current: 'OBSERVING', trimScheduled: false };
   }
 
-  // Precondition 2: Not scrolled up (if pauseOnScrollUp enabled)
-  if (!options.force && state.settings.pauseOnScrollUp && !state.isAtBottom) {
-    logDebug('Trim evaluation skipped: Scrolled up');
-    return { ...state, current: 'OBSERVING', trimScheduled: false };
-  }
-
-  // Precondition 3: Not streaming
+  // Precondition 2: Not streaming
   if (isStreaming(state.conversationRoot)) {
     logDebug('Trim evaluation skipped: Streaming in progress');
     return { ...state, current: 'OBSERVING', trimScheduled: false };
@@ -143,33 +124,53 @@ export function evaluateTrim(state: TrimmerState, options: { force?: boolean } =
     logDebug(
       `Trim evaluation skipped: Not enough candidates (${nodes.length} < ${DOM.MIN_CANDIDATES})`
     );
+    // Update status bar to show waiting state
+    if (state.settings.showStatusBar) {
+      updateStatusBar({
+        totalMessages: nodes.length,
+        visibleMessages: nodes.length,
+        trimmedMessages: 0,
+        keepLastN: state.settings.keep,
+      });
+    }
     return { ...state, current: 'OBSERVING', trimScheduled: false };
   }
 
   // Calculate overflow
-  const toKeep = calculateKeepCount(nodes, state.settings);
+  const toKeep = calculateKeepCount(state.settings);
   const overflow = nodes.length - toKeep;
 
   if (overflow <= 0) {
     logDebug(`Trim evaluation skipped: No overflow (${nodes.length} <= ${toKeep})`);
+    // Update status bar with current state (nothing trimmed)
+    if (state.settings.showStatusBar) {
+      updateStatusBar({
+        totalMessages: nodes.length,
+        visibleMessages: nodes.length,
+        trimmedMessages: 0,
+        keepLastN: state.settings.keep,
+      });
+    }
     return { ...state, current: 'OBSERVING', trimScheduled: false };
   }
 
-  // Determine which nodes to remove, skipping preserved roles before slicing
-  const removableNodes = state.settings.preserveSystem
-    ? nodes.filter((n) => n.role !== 'system' && n.role !== 'tool')
-    : nodes;
-
-  const toRemove = removableNodes.slice(0, overflow);
-
-  if (toRemove.length === 0) {
-    logDebug('Trim evaluation skipped: No removable nodes after preservation filter');
-    return { ...state, current: 'OBSERVING', trimScheduled: false };
-  }
+  // Determine which nodes to remove (oldest first)
+  const toRemove = nodes.slice(0, overflow);
 
   // Execute trim
   logInfo(`Executing trim: Removing ${toRemove.length} nodes (keeping ${toKeep})`);
   executeTrim(toRemove, state.observer);
+
+  // Update status bar with trimming stats
+  if (state.settings.showStatusBar) {
+    const visibleAfterTrim = nodes.length - toRemove.length;
+    updateStatusBar({
+      totalMessages: nodes.length,
+      visibleMessages: visibleAfterTrim,
+      trimmedMessages: toRemove.length,
+      keepLastN: state.settings.keep,
+    });
+  }
 
   return {
     ...state,
