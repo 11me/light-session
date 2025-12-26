@@ -28,7 +28,17 @@
     "extension",
     "chatgpt",
     "performance",
-    "webextension"
+    "webextension",
+    "firefox-addon",
+    "browser-extension",
+    "dom-optimization",
+    "privacy",
+    "open-source",
+    "chatgpt-extension",
+    "typescript",
+    "firefox-extension",
+    "performance-optimization",
+    "lag-fix"
   ],
   "author": "LightSession Contributors",
   "license": "MIT",
