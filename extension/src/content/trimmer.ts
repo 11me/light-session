@@ -3,9 +3,9 @@
  * Core trimming logic with state management and batch execution
  */
 
-import type { TrimmerState, LsSettings, NodeInfo } from '../shared/types';
+import type { TrimmerState, LsSettings, NodeInfo, EvaluateTrimOptions } from '../shared/types';
 import { TIMING, DOM, DEFAULT_SETTINGS } from '../shared/constants';
-import { logDebug, logWarn, logInfo } from '../shared/logger';
+import { logDebug, logWarn, logInfo, logError } from '../shared/logger';
 import { buildActiveThread, findConversationRoot } from './dom-helpers';
 import { isStreaming } from './stream-detector';
 import { createDebouncedObserver } from './observers';
@@ -45,6 +45,16 @@ export function boot(state: TrimmerState, onMutation: () => void): TrimmerState 
   observer.observe(root, {
     childList: true,
     subtree: true,
+    // Monitor specific attributes that indicate message changes
+    // This reduces callback invocations for unrelated DOM changes
+    attributes: true,
+    attributeFilter: [
+      'data-turn',
+      'data-message-id',
+      'data-message-author-role',
+      'hidden',
+      'aria-hidden',
+    ],
   });
 
   logInfo('Trimmer booted successfully');
@@ -76,13 +86,31 @@ export function shutdown(state: TrimmerState): TrimmerState {
 
 /**
  * Schedule trim evaluation (debounced)
+ * @param state Current trimmer state
+ * @param evaluateTrimCallback Callback to evaluate and execute trim
+ * @param onComplete Optional callback invoked after trim completes (success or error)
+ *                   Used to reset trimScheduled flag in caller's state
  */
-export function scheduleTrim(state: TrimmerState, evaluateTrimCallback: () => void): TrimmerState {
+export function scheduleTrim(
+  state: TrimmerState,
+  evaluateTrimCallback: () => void,
+  onComplete?: () => void
+): TrimmerState {
   if (!state.settings.enabled || state.trimScheduled) {
     return state;
   }
 
-  setTimeout(evaluateTrimCallback, TIMING.DEBOUNCE_MS);
+  setTimeout(() => {
+    try {
+      evaluateTrimCallback();
+    } catch (error) {
+      logError('Trim evaluation failed:', error);
+    } finally {
+      // Always invoke onComplete to allow caller to reset trimScheduled
+      // This ensures state doesn't get stuck if callback throws
+      onComplete?.();
+    }
+  }, TIMING.DEBOUNCE_MS);
 
   return { ...state, trimScheduled: true };
 }
@@ -97,13 +125,22 @@ export function calculateKeepCount(settings: LsSettings): number {
 /**
  * Evaluate trim: Check preconditions and execute if met
  * PENDING_TRIM → TRIMMING or back to OBSERVING
+ *
+ * @param state Current trimmer state
+ * @param options Evaluation options including optional settings snapshot
+ *                Using a settings snapshot prevents race conditions when
+ *                settings change during async trim scheduling
  */
-export function evaluateTrim(state: TrimmerState, _options: { force?: boolean } = {}): TrimmerState {
+export function evaluateTrim(state: TrimmerState, options: EvaluateTrimOptions = {}): TrimmerState {
+  // Use provided settings snapshot or fall back to current state settings
+  // This prevents race conditions when settings change between scheduling and execution
+  const settings = options.settings ?? state.settings;
+
   logDebug('=== evaluateTrim called ===');
-  logDebug(`Settings: enabled=${state.settings.enabled}, keep=${state.settings.keep}`);
+  logDebug(`Settings: enabled=${settings.enabled}, keep=${settings.keep}`);
 
   // Precondition 1: Enabled
-  if (!state.settings.enabled) {
+  if (!settings.enabled) {
     logDebug('Trim evaluation skipped: Disabled');
     return { ...state, current: 'OBSERVING', trimScheduled: false };
   }
@@ -125,30 +162,30 @@ export function evaluateTrim(state: TrimmerState, _options: { force?: boolean } 
       `Trim evaluation skipped: Not enough candidates (${nodes.length} < ${DOM.MIN_CANDIDATES})`
     );
     // Update status bar to show waiting state
-    if (state.settings.showStatusBar) {
+    if (settings.showStatusBar) {
       updateStatusBar({
         totalMessages: nodes.length,
         visibleMessages: nodes.length,
         trimmedMessages: 0,
-        keepLastN: state.settings.keep,
+        keepLastN: settings.keep,
       });
     }
     return { ...state, current: 'OBSERVING', trimScheduled: false };
   }
 
   // Calculate overflow
-  const toKeep = calculateKeepCount(state.settings);
+  const toKeep = calculateKeepCount(settings);
   const overflow = nodes.length - toKeep;
 
   if (overflow <= 0) {
     logDebug(`Trim evaluation skipped: No overflow (${nodes.length} <= ${toKeep})`);
     // Update status bar with current state (nothing trimmed)
-    if (state.settings.showStatusBar) {
+    if (settings.showStatusBar) {
       updateStatusBar({
         totalMessages: nodes.length,
         visibleMessages: nodes.length,
         trimmedMessages: 0,
-        keepLastN: state.settings.keep,
+        keepLastN: settings.keep,
       });
     }
     return { ...state, current: 'OBSERVING', trimScheduled: false };
@@ -162,13 +199,13 @@ export function evaluateTrim(state: TrimmerState, _options: { force?: boolean } 
   executeTrim(toRemove, state.observer);
 
   // Update status bar with trimming stats
-  if (state.settings.showStatusBar) {
+  if (settings.showStatusBar) {
     const visibleAfterTrim = nodes.length - toRemove.length;
     updateStatusBar({
       totalMessages: nodes.length,
       visibleMessages: visibleAfterTrim,
       trimmedMessages: toRemove.length,
-      keepLastN: state.settings.keep,
+      keepLastN: settings.keep,
     });
   }
 
@@ -178,6 +215,18 @@ export function evaluateTrim(state: TrimmerState, _options: { force?: boolean } 
     trimScheduled: false,
     lastTrimTime: performance.now(),
   };
+}
+
+// Callback invoked when trim completes to handle potential missed mutations
+let onTrimCompleteCallback: (() => void) | null = null;
+
+/**
+ * Set a callback to be invoked when trim completes.
+ * Used to re-evaluate DOM after observer reconnection in case mutations
+ * occurred while observer was disconnected.
+ */
+export function setOnTrimComplete(callback: (() => void) | null): void {
+  onTrimCompleteCallback = callback;
 }
 
 /**
@@ -233,12 +282,30 @@ function executeTrim(toRemove: NodeInfo[], observer: MutationObserver | null): v
       const totalTime = performance.now() - startTime;
       logInfo(`Trim complete: Removed ${removed} nodes in ${totalTime.toFixed(2)}ms`);
 
-      // Re-attach observer
+      // Re-attach observer with same configuration as in boot()
       if (observer) {
         const root = findConversationRoot();
         if (root) {
-          observer.observe(root, { childList: true, subtree: true });
+          observer.observe(root, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: [
+              'data-turn',
+              'data-message-id',
+              'data-message-author-role',
+              'hidden',
+              'aria-hidden',
+            ],
+          });
         }
+      }
+
+      // Invoke callback to handle potential missed mutations
+      // This allows re-evaluation of DOM after observer reconnection
+      if (onTrimCompleteCallback) {
+        // Use setTimeout to allow observer to settle before re-evaluation
+        setTimeout(onTrimCompleteCallback, 0);
       }
     }
   }

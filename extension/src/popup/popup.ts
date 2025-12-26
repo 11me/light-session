@@ -7,13 +7,33 @@ import type { LsSettings } from '../shared/types';
 import { sendMessageWithTimeout } from '../shared/messages';
 import { SUPPORT_URL } from '../shared/constants';
 
-// UI Elements
+/**
+ * Get DOM element by ID with null safety.
+ * Throws if element doesn't exist (fail-fast on missing UI elements).
+ */
+function getRequiredElement<T extends HTMLElement>(id: string): T {
+  const el = document.getElementById(id);
+  if (!el) {
+    throw new Error(`Required element #${id} not found`);
+  }
+  return el as T;
+}
+
+/**
+ * Get optional DOM element by ID.
+ * Returns null if element doesn't exist.
+ */
+function getOptionalElement<T extends HTMLElement>(id: string): T | null {
+  return document.getElementById(id) as T | null;
+}
+
+// UI Elements (initialized in initialize())
 let enableToggle: HTMLInputElement;
 let keepSlider: HTMLInputElement;
 let keepValue: HTMLElement;
-let showStatusBarCheckbox: HTMLInputElement;
-let debugCheckbox: HTMLInputElement;
-let debugGroup: HTMLElement;
+let showStatusBarCheckbox: HTMLInputElement | null;
+let debugCheckbox: HTMLInputElement | null;
+let debugGroup: HTMLElement | null;
 let refreshButton: HTMLButtonElement;
 let statusElement: HTMLElement;
 let supportLink: HTMLButtonElement;
@@ -90,15 +110,18 @@ async function isDevMode(): Promise<boolean> {
  * Initialize popup UI
  */
 async function initialize(): Promise<void> {
-  // Get UI elements
-  enableToggle = document.getElementById('enableToggle') as HTMLInputElement;
-  keepSlider = document.getElementById('keepSlider') as HTMLInputElement;
-  keepValue = document.getElementById('keepValue') as HTMLElement;
-  showStatusBarCheckbox = document.getElementById('showStatusBarCheckbox') as HTMLInputElement;
-  debugCheckbox = document.getElementById('debugCheckbox') as HTMLInputElement;
-  debugGroup = document.getElementById('debugGroup') as HTMLElement;
-  refreshButton = document.getElementById('refreshButton') as HTMLButtonElement;
-  statusElement = document.getElementById('status') as HTMLElement;
+  // Get required UI elements (throw if missing)
+  enableToggle = getRequiredElement<HTMLInputElement>('enableToggle');
+  keepSlider = getRequiredElement<HTMLInputElement>('keepSlider');
+  keepValue = getRequiredElement<HTMLElement>('keepValue');
+  refreshButton = getRequiredElement<HTMLButtonElement>('refreshButton');
+  statusElement = getRequiredElement<HTMLElement>('status');
+  supportLink = getRequiredElement<HTMLButtonElement>('supportLink');
+
+  // Get optional UI elements (may not exist in all configurations)
+  showStatusBarCheckbox = getOptionalElement<HTMLInputElement>('showStatusBarCheckbox');
+  debugCheckbox = getOptionalElement<HTMLInputElement>('debugCheckbox');
+  debugGroup = getOptionalElement<HTMLElement>('debugGroup');
 
   // Check if dev mode and show debug options
   const devMode = await isDevMode();
@@ -120,9 +143,6 @@ async function initialize(): Promise<void> {
     debugCheckbox.addEventListener('change', handleDebugToggle);
   }
   refreshButton.addEventListener('click', () => void handleRefreshClick());
-
-  // Support link
-  supportLink = document.getElementById('supportLink') as HTMLButtonElement;
   supportLink.addEventListener('click', handleSupportClick);
 }
 
@@ -211,14 +231,18 @@ function handleKeepSliderChange(): void {
  * Handle show status bar toggle
  */
 function handleShowStatusBarToggle(): void {
-  void updateSettings({ showStatusBar: showStatusBarCheckbox.checked });
+  if (showStatusBarCheckbox) {
+    void updateSettings({ showStatusBar: showStatusBarCheckbox.checked });
+  }
 }
 
 /**
  * Handle debug mode toggle
  */
 function handleDebugToggle(): void {
-  void updateSettings({ debug: debugCheckbox.checked });
+  if (debugCheckbox) {
+    void updateSettings({ debug: debugCheckbox.checked });
+  }
 }
 
 /**
@@ -228,12 +252,12 @@ async function handleRefreshClick(): Promise<void> {
   try {
     // Get active tab
     const tabs = await browser.tabs.query({ active: true, currentWindow: true });
-    if (tabs.length === 0) {
+    const tab = tabs[0];
+
+    if (!tab) {
       showStatus('No active tab found', true);
       return;
     }
-
-    const tab = tabs[0];
 
     // Check if it's a ChatGPT tab
     if (tab.url && (tab.url.includes('chat.openai.com') || tab.url.includes('chatgpt.com'))) {
@@ -281,6 +305,9 @@ function updateDisabledState(enabled: boolean): void {
   for (let i = 1; i < settingGroups.length - 1; i++) {
     // Skip first (toggle) and last (refresh button)
     const group = settingGroups[i];
+    if (!group) {
+      continue;
+    }
     if (enabled) {
       group.classList.remove('disabled');
     } else {

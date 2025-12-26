@@ -52,6 +52,14 @@ export interface TrimmerState {
   settings: LsSettings; // Cached settings (refreshed on storage change)
 }
 
+/**
+ * Options for evaluateTrim function
+ */
+export interface EvaluateTrimOptions {
+  force?: boolean; // Force trim even if recently executed
+  settings?: LsSettings; // Settings snapshot to use (prevents race conditions with async settings changes)
+}
+
 // ============================================================================
 // DOM Selector Strategy Types
 // ============================================================================

@@ -21,8 +21,8 @@ web-ext-artifacts/
 *.zip
 
 # But keep these important JS files
-!build.js
-!.eslintrc.json
+!build.cjs
+!eslint.config.js
 
 # IDEs
 .vscode/
@@ -50,3 +50,4 @@ extension/.dev
 # Temporary
 *.tmp
 *.temp
+.serena/

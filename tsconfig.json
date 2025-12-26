@@ -12,7 +12,10 @@
     "types": ["firefox-webext-browser"],
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true
+    "sourceMap": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true
   },
   "include": ["extension/src/**/*"],
   "exclude": ["node_modules", "extension/dist", "tests"]

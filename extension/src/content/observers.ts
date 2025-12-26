@@ -16,7 +16,7 @@ export function createDebouncedObserver(
 ): MutationObserver {
   let timeoutId: number | null = null;
 
-  const debouncedCallback = () => {
+  const debouncedCallback = (): void => {
     if (timeoutId !== null) {
       clearTimeout(timeoutId);
     }
@@ -41,7 +41,7 @@ export function setupScrollTracking(
   let lastCheckTime = 0;
   let rafId: number | null = null;
 
-  const checkScroll = () => {
+  const checkScroll = (): void => {
     const now = performance.now();
     if (now - lastCheckTime < TIMING.SCROLL_THROTTLE_MS) {
       return;
@@ -52,7 +52,7 @@ export function setupScrollTracking(
     onScrollChange(isAtBottom);
   };
 
-  const throttledScroll = () => {
+  const throttledScroll = (): void => {
     if (rafId !== null) {
       return;
     }

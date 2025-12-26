@@ -9,7 +9,7 @@ import type { TrimmerState, LsSettings } from '../shared/types';
 import { loadSettings } from '../shared/storage';
 import { setDebugMode, logInfo, logError } from '../shared/logger';
 import { findConversationRoot } from './dom-helpers';
-import { createInitialState, boot, shutdown, scheduleTrim, evaluateTrim } from './trimmer';
+import { createInitialState, boot, shutdown, scheduleTrim, evaluateTrim, setOnTrimComplete } from './trimmer';
 import { setStatusBarVisibility, removeStatusBar, resetAccumulatedTrimmed, showLayoutNotRecognized } from './status-bar';
 
 // Global state
@@ -18,6 +18,11 @@ let pageObserver: MutationObserver | null = null;
 let navigationCleanup: (() => void) | null = null;
 let pendingRootSync = false;
 let pendingRootSyncReason: string | null = null;
+
+// Store original history methods at module level to prevent memory leak
+// from chained wrappers when navigation watcher is reinstalled
+let originalPushState: typeof history.pushState | null = null;
+let originalReplaceState: typeof history.replaceState | null = null;
 
 /**
  * Schedule a root sync operation on the microtask queue.
@@ -159,11 +164,13 @@ function stopRootSyncWatchers(): void {
 
 /**
  * Listen for SPA navigation changes (pushState/replaceState/popstate/hashchange).
+ * Uses module-level storage for original history methods to prevent memory leak
+ * from chained wrappers when reinstalled.
  */
 function installNavigationWatcher(onChange: (reason: string) => void): () => void {
   let lastUrl = window.location.href;
 
-  const scheduleCheck = (reason: string) => {
+  const scheduleCheck = (reason: string): void => {
     void Promise.resolve().then(() => {
       const current = window.location.href;
       if (current === lastUrl) {
@@ -175,27 +182,37 @@ function installNavigationWatcher(onChange: (reason: string) => void): () => voi
     });
   };
 
-  const handlePopState = () => scheduleCheck('popstate');
-  const handleHashChange = () => scheduleCheck('hashchange');
+  const handlePopState = (): void => scheduleCheck('popstate');
+  const handleHashChange = (): void => scheduleCheck('hashchange');
 
   window.addEventListener('popstate', handlePopState);
   window.addEventListener('hashchange', handleHashChange);
 
-  const originalPushState = history.pushState.bind(history);
-  const originalReplaceState = history.replaceState.bind(history);
+  // Only capture original methods on first installation to prevent
+  // saving already-wrapped versions and creating a chain of wrappers
+  if (!originalPushState) {
+    originalPushState = history.pushState.bind(history);
+  }
+  if (!originalReplaceState) {
+    originalReplaceState = history.replaceState.bind(history);
+  }
+
+  // Create typed references for use in wrapper functions
+  const boundPushState = originalPushState;
+  const boundReplaceState = originalReplaceState;
 
   history.pushState = function (
-    ...args: Parameters<typeof originalPushState>
-  ): ReturnType<typeof originalPushState> {
-    const result = originalPushState(...args);
+    ...args: Parameters<typeof history.pushState>
+  ): ReturnType<typeof history.pushState> {
+    const result = boundPushState(...args);
     scheduleCheck('pushstate');
     return result;
   };
 
   history.replaceState = function (
-    ...args: Parameters<typeof originalReplaceState>
-  ): ReturnType<typeof originalReplaceState> {
-    const result = originalReplaceState(...args);
+    ...args: Parameters<typeof history.replaceState>
+  ): ReturnType<typeof history.replaceState> {
+    const result = boundReplaceState(...args);
     scheduleCheck('replacestate');
     return result;
   };
@@ -203,8 +220,13 @@ function installNavigationWatcher(onChange: (reason: string) => void): () => voi
   return () => {
     window.removeEventListener('popstate', handlePopState);
     window.removeEventListener('hashchange', handleHashChange);
-    history.pushState = originalPushState;
-    history.replaceState = originalReplaceState;
+    // Always restore to true originals stored at module level
+    if (originalPushState) {
+      history.pushState = originalPushState;
+    }
+    if (originalReplaceState) {
+      history.replaceState = originalReplaceState;
+    }
   };
 }
 
@@ -219,6 +241,15 @@ async function initialize(): Promise<void> {
     const settings = await loadSettings();
     state.settings = settings;
     setDebugMode(settings.debug);
+
+    // Set up callback to handle potentially missed mutations during trim
+    // This ensures DOM is re-evaluated after observer reconnection
+    setOnTrimComplete(() => {
+      // Only re-evaluate if trimmer is active and not already scheduled
+      if (state.current === 'OBSERVING' && !state.trimScheduled) {
+        handleMutation();
+      }
+    });
 
     // Boot trimmer if enabled
     if (settings.enabled) {
@@ -251,9 +282,20 @@ async function initialize(): Promise<void> {
 function handleMutation(force = false): void {
   ensureConversationBindings(force ? 'forced-trim' : 'mutation');
 
-  state = scheduleTrim(state, () => {
-    state = evaluateTrim(state, { force });
-  });
+  // Capture settings snapshot at scheduling time to prevent race conditions
+  // where settings might change between scheduling and evaluation
+  const settingsSnapshot = { ...state.settings };
+
+  state = scheduleTrim(
+    state,
+    () => {
+      state = evaluateTrim(state, { force, settings: settingsSnapshot });
+    },
+    // onComplete callback ensures trimScheduled is reset even on error
+    () => {
+      state = { ...state, trimScheduled: false };
+    }
+  );
 }
 
 /**

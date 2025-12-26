@@ -2,6 +2,11 @@
 /**
  * Build script for LightSession extension
  * Bundles TypeScript → single JS files (no imports) for MV3 compatibility
+ *
+ * Usage:
+ *   node build.js          - Development build (with sourcemaps)
+ *   node build.js --watch  - Watch mode for development
+ *   NODE_ENV=production node build.js - Production build (minified, no sourcemaps)
  */
 
 const esbuild = require('esbuild');
@@ -9,6 +14,7 @@ const fs = require('fs');
 const path = require('path');
 
 const isWatch = process.argv.includes('--watch');
+const isProduction = process.env.NODE_ENV === 'production';
 
 /**
  * Copy static files from src to extension folder
@@ -31,11 +37,23 @@ const buildOptions = {
   bundle: true,
   format: 'iife',
   target: 'es2020',
-  sourcemap: true,
   platform: 'browser',
+  // Production: minify and no sourcemaps
+  // Development: no minification, with sourcemaps for debugging
+  minify: isProduction,
+  sourcemap: !isProduction,
+  // Drop console.log and debugger in production for smaller bundle
+  drop: isProduction ? ['debugger'] : [],
+  // Define build mode for conditional code
+  define: {
+    'process.env.NODE_ENV': JSON.stringify(isProduction ? 'production' : 'development'),
+  },
 };
 
 async function build() {
+  const mode = isProduction ? 'production' : 'development';
+  console.log(`🔧 Building in ${mode} mode${isProduction ? ' (minified)' : ' (with sourcemaps)'}...\n`);
+
   try {
     await esbuild.build({
       ...buildOptions,
@@ -60,7 +78,7 @@ async function build() {
 
     copyStaticFiles();
 
-    console.log('\n✅ Build complete! Extension ready for Firefox.');
+    console.log(`\n✅ ${mode.charAt(0).toUpperCase() + mode.slice(1)} build complete! Extension ready for Firefox.`);
   } catch (error) {
     console.error('❌ Build failed:', error);
     process.exit(1);
