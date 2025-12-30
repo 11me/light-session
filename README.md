@@ -38,6 +38,7 @@ Built after too many coding sessions where a single ChatGPT tab would start eati
 - **Automatic trimming** – keeps only the last _N_ messages visible (configurable range: 1–100 messages)
 - **DOM batching** – node removals are batched within the ~16 ms budget for 60 fps scrolling
 - **Smart timing** – waits for AI responses to fully finish streaming before trimming
+- **Ultra Lean Mode** _(Experimental)_ – aggressive optimizations: kills animations, applies CSS containment, dehighlights old code blocks
 
 **User experience**
 
@@ -107,6 +108,7 @@ When you want to see the full history again:
 - **Extension enabled** – master on/off toggle.
 - **Keep last N messages** – how many messages remain visible in the DOM (1–100).
 - **Show status bar** – display a floating pill with trim statistics.
+- **Ultra Lean Mode** – aggressive performance mode for very long/laggy chats (experimental).
 - **Refresh** – reloads the page to restore all messages.
 
 ### Keyboard accessibility
