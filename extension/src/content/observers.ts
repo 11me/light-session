@@ -5,6 +5,7 @@
 
 import { TIMING, DOM } from '../shared/constants';
 import { logDebug } from '../shared/logger';
+import type { TrimMode } from '../shared/types';
 
 /**
  * Create debounced MutationObserver
@@ -28,6 +29,45 @@ export function createDebouncedObserver(
   };
 
   return new MutationObserver(debouncedCallback);
+}
+
+/**
+ * Create microtask-based MutationObserver for BOOT mode
+ * Uses queueMicrotask to coalesce mutations and execute before next paint
+ *
+ * Key insight: MutationObserver callback already runs as microtask.
+ * Using queueMicrotask inside coalesces multiple synchronous DOM changes
+ * into a single trim evaluation, executing BEFORE the browser paints.
+ */
+export function createMicrotaskObserver(callback: () => void): MutationObserver {
+  let scheduled = false;
+
+  const microtaskCallback = (): void => {
+    if (scheduled) {
+      return;
+    }
+
+    scheduled = true;
+    queueMicrotask(() => {
+      scheduled = false;
+      callback();
+    });
+  };
+
+  return new MutationObserver(microtaskCallback);
+}
+
+/**
+ * Create MutationObserver with adaptive scheduling based on trim mode
+ */
+export function createAdaptiveObserver(
+  callback: () => void,
+  mode: TrimMode
+): MutationObserver {
+  if (mode === 'BOOT') {
+    return createMicrotaskObserver(callback);
+  }
+  return createDebouncedObserver(callback);
 }
 
 /**

@@ -129,6 +129,13 @@ async function initialize(): Promise<void> {
     debugGroup.style.display = 'block';
   }
 
+  // Display version from manifest
+  const versionElement = getOptionalElement<HTMLElement>('version');
+  if (versionElement) {
+    const manifest = browser.runtime.getManifest();
+    versionElement.textContent = `v${manifest.version}`;
+  }
+
   // Load current settings
   await loadSettings();
 

@@ -26,6 +26,7 @@ import {
   detectRole,
   getNodeId,
   isVisible,
+  shouldIncludeInThread,
   findConversationRoot,
   findScrollableAncestor,
   buildActiveThread,
@@ -304,6 +305,17 @@ describe('dom-helpers', () => {
       const el = document.createElement('div');
       container.appendChild(el);
       document.body.appendChild(container);
+
+      // Mock offsetParent and getClientRects to pass first two checks
+      // This ensures we're actually testing the hidden ancestor logic
+      Object.defineProperty(el, 'offsetParent', {
+        get: () => document.body,
+        configurable: true,
+      });
+      vi.spyOn(el, 'getClientRects').mockReturnValue([
+        { top: 0, left: 0, right: 100, bottom: 100, width: 100, height: 100, x: 0, y: 0 } as DOMRect,
+      ] as DOMRectList);
+
       expect(isVisible(el)).toBe(false);
     });
 
@@ -313,6 +325,17 @@ describe('dom-helpers', () => {
       const el = document.createElement('div');
       container.appendChild(el);
       document.body.appendChild(container);
+
+      // Mock offsetParent and getClientRects to pass first two checks
+      // This ensures we're actually testing the aria-hidden ancestor logic
+      Object.defineProperty(el, 'offsetParent', {
+        get: () => document.body,
+        configurable: true,
+      });
+      vi.spyOn(el, 'getClientRects').mockReturnValue([
+        { top: 0, left: 0, right: 100, bottom: 100, width: 100, height: 100, x: 0, y: 0 } as DOMRect,
+      ] as DOMRectList);
+
       expect(isVisible(el)).toBe(false);
     });
 
@@ -355,6 +378,147 @@ describe('dom-helpers', () => {
       vi.spyOn(el, 'getClientRects').mockReturnValue([] as unknown as DOMRectList);
 
       expect(isVisible(el)).toBe(false);
+    });
+  });
+
+  describe('shouldIncludeInThread', () => {
+    // Tests for trusted ChatGPT markers (data-turn, data-message-id)
+    // These should bypass getClientRects check for content-visibility: auto compatibility
+
+    describe('trusted markers (data-turn)', () => {
+      it('should include element with data-turn even with empty getClientRects', () => {
+        const el = document.createElement('div');
+        el.dataset.turn = 'user';
+        document.body.appendChild(el);
+
+        // Mock offsetParent (not display:none)
+        Object.defineProperty(el, 'offsetParent', {
+          get: () => document.body,
+          configurable: true,
+        });
+
+        // Simulate content-visibility: auto - empty client rects for offscreen
+        vi.spyOn(el, 'getClientRects').mockReturnValue([] as unknown as DOMRectList);
+
+        // Should still include because data-turn is trusted
+        expect(shouldIncludeInThread(el)).toBe(true);
+      });
+
+      it('should include element with data-turn even when offsetParent is null', () => {
+        // offsetParent can be null for position:fixed, display:contents, etc.
+        // For trusted markers we trust the attribute and don't check offsetParent
+        const el = document.createElement('div');
+        el.dataset.turn = 'assistant';
+        document.body.appendChild(el);
+
+        Object.defineProperty(el, 'offsetParent', {
+          get: () => null,
+          configurable: true,
+        });
+
+        // Should still include - trusted markers are reliable
+        expect(shouldIncludeInThread(el)).toBe(true);
+      });
+
+      it('should exclude element with data-turn when has hidden ancestor', () => {
+        const container = document.createElement('div');
+        container.setAttribute('hidden', '');
+        const el = document.createElement('div');
+        el.dataset.turn = 'user';
+        container.appendChild(el);
+        document.body.appendChild(container);
+
+        // Mock offsetParent (not display:none itself)
+        Object.defineProperty(el, 'offsetParent', {
+          get: () => document.body,
+          configurable: true,
+        });
+
+        expect(shouldIncludeInThread(el)).toBe(false);
+      });
+
+      it('should exclude element with data-turn when has aria-hidden ancestor', () => {
+        const container = document.createElement('div');
+        container.setAttribute('aria-hidden', 'true');
+        const el = document.createElement('div');
+        el.dataset.turn = 'assistant';
+        container.appendChild(el);
+        document.body.appendChild(container);
+
+        Object.defineProperty(el, 'offsetParent', {
+          get: () => document.body,
+          configurable: true,
+        });
+
+        expect(shouldIncludeInThread(el)).toBe(false);
+      });
+    });
+
+    describe('trusted markers (data-message-id)', () => {
+      it('should include element with data-message-id even with empty getClientRects', () => {
+        const el = document.createElement('div');
+        el.dataset.messageId = 'msg-123';
+        document.body.appendChild(el);
+
+        Object.defineProperty(el, 'offsetParent', {
+          get: () => document.body,
+          configurable: true,
+        });
+
+        // Simulate content-visibility: auto
+        vi.spyOn(el, 'getClientRects').mockReturnValue([] as unknown as DOMRectList);
+
+        expect(shouldIncludeInThread(el)).toBe(true);
+      });
+
+      it('should include element with data-message-id even when offsetParent is null', () => {
+        // offsetParent can be null for position:fixed, display:contents, etc.
+        // For trusted markers we trust the attribute and don't check offsetParent
+        const el = document.createElement('div');
+        el.dataset.messageId = 'msg-456';
+        document.body.appendChild(el);
+
+        Object.defineProperty(el, 'offsetParent', {
+          get: () => null,
+          configurable: true,
+        });
+
+        // Should still include - trusted markers are reliable
+        expect(shouldIncludeInThread(el)).toBe(true);
+      });
+    });
+
+    describe('non-trusted elements (fallback to isVisible)', () => {
+      it('should exclude element without trusted markers when getClientRects is empty', () => {
+        const el = document.createElement('div');
+        document.body.appendChild(el);
+
+        Object.defineProperty(el, 'offsetParent', {
+          get: () => document.body,
+          configurable: true,
+        });
+
+        // Empty client rects - isVisible returns false
+        vi.spyOn(el, 'getClientRects').mockReturnValue([] as unknown as DOMRectList);
+
+        expect(shouldIncludeInThread(el)).toBe(false);
+      });
+
+      it('should include element without trusted markers when fully visible', () => {
+        const el = document.createElement('div');
+        document.body.appendChild(el);
+
+        Object.defineProperty(el, 'offsetParent', {
+          get: () => document.body,
+          configurable: true,
+        });
+
+        vi.spyOn(el, 'getClientRects').mockReturnValue([
+          { top: 0, left: 0, right: 100, bottom: 100, width: 100, height: 100, x: 0, y: 0 } as DOMRect,
+        ] as DOMRectList);
+
+        expect(shouldIncludeInThread(el)).toBe(true);
+      });
     });
   });
 
@@ -618,7 +782,10 @@ describe('dom-helpers', () => {
       expect(result[0].role).toBe('user');
     });
 
-    it('should sort nodes by Y-coordinate', () => {
+    it('should use DOM order index as Y (no Y-coordinate sorting)', () => {
+      // NOTE: We no longer sort by Y-coordinate because content-visibility: auto
+      // breaks getBoundingClientRect() for offscreen elements. Instead, we trust
+      // DOM order (NodeList is already in document order) and use index as pseudo-Y.
       const node1 = document.createElement('div');
       const node2 = document.createElement('div');
       const node3 = document.createElement('div');
@@ -638,45 +805,14 @@ describe('dom-helpers', () => {
         ] as DOMRectList);
       });
 
-      // Mock getBoundingClientRect with different Y positions (out of order)
-      vi.spyOn(node1, 'getBoundingClientRect').mockReturnValue({
-        top: 300,
-        left: 0,
-        right: 100,
-        bottom: 400,
-        width: 100,
-        height: 100,
-        x: 0,
-        y: 300,
-      } as DOMRect);
-      vi.spyOn(node2, 'getBoundingClientRect').mockReturnValue({
-        top: 0,
-        left: 0,
-        right: 100,
-        bottom: 100,
-        width: 100,
-        height: 100,
-        x: 0,
-        y: 0,
-      } as DOMRect);
-      vi.spyOn(node3, 'getBoundingClientRect').mockReturnValue({
-        top: 150,
-        left: 0,
-        right: 100,
-        bottom: 250,
-        width: 100,
-        height: 100,
-        x: 0,
-        y: 150,
-      } as DOMRect);
-
       vi.mocked(collectCandidates).mockReturnValue({ nodes: [node1, node2, node3], tier: 'A' });
 
       const result = buildActiveThread();
       expect(result).toHaveLength(3);
+      // Y is now the DOM index, not the actual Y-coordinate
       expect(result[0].y).toBe(0);
-      expect(result[1].y).toBe(150);
-      expect(result[2].y).toBe(300);
+      expect(result[1].y).toBe(1);
+      expect(result[2].y).toBe(2);
     });
   });
 });

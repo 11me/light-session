@@ -220,6 +220,13 @@ footer {
   text-align: center;
 }
 
+.version {
+  display: block;
+  margin-top: 8px;
+  font-size: 11px;
+  color: #999;
+}
+
 .status {
   font-size: 12px;
   min-height: 18px;

@@ -6,7 +6,7 @@
 import type { MsgRole, NodeInfo } from '../shared/types';
 import { DOM } from '../shared/constants';
 import { logDebug, logWarn } from '../shared/logger';
-import { collectCandidates } from './selectors';
+import { collectCandidates, collectCandidatesFast } from './selectors';
 
 /**
  * Detect message role from DOM element
@@ -74,6 +74,35 @@ export function isVisible(el: HTMLElement): boolean {
   }
 
   return true;
+}
+
+/**
+ * Check if element should be included in thread for trimming.
+ *
+ * IMPORTANT: content-visibility: auto (used for render optimization) causes
+ * offscreen elements to return empty client rects from getClientRects().
+ * Using isVisible() would exclude these elements, breaking trimming.
+ *
+ * For trusted ChatGPT message markers (data-turn, data-message-id), we only
+ * check for explicit hiding (hidden attr, aria-hidden, display:none).
+ * For other elements (Tier C fallback), we use full isVisible() check.
+ */
+export function shouldIncludeInThread(el: HTMLElement): boolean {
+  // Fast path: trusted ChatGPT message markers
+  // These elements ARE messages - only exclude if explicitly hidden
+  // Note: we intentionally DON'T check offsetParent here because:
+  // - offsetParent is null for position:fixed, display:contents, etc.
+  // - Trusted markers are reliable enough to trust without layout checks
+  if (el.dataset.turn || el.dataset.messageId) {
+    // Only exclude if explicitly hidden via attributes
+    if (el.closest('[hidden], [aria-hidden="true"]')) {
+      return false;
+    }
+    return true;
+  }
+
+  // Fallback for non-trusted elements: use full visibility check
+  return isVisible(el);
 }
 
 /**
@@ -154,7 +183,12 @@ export function findScrollableAncestor(el: HTMLElement): HTMLElement | null {
 
 /**
  * Build NodeInfo array for active thread
- * Filters visible nodes, validates Y-monotonicity, assigns roles and IDs
+ * Filters visible nodes, assigns roles and IDs
+ *
+ * Note: We trust DOM order instead of Y-coordinate sorting because:
+ * 1. NodeList from querySelectorAll is already in document order
+ * 2. content-visibility: auto breaks getBoundingClientRect() for offscreen elements
+ * 3. DOM order is more reliable and doesn't trigger layout
  */
 export function buildActiveThread(): NodeInfo[] {
   const { nodes, tier } = collectCandidates();
@@ -164,19 +198,56 @@ export function buildActiveThread(): NodeInfo[] {
     return [];
   }
 
-  // Build NodeInfo array
-  const nodeInfos: NodeInfo[] = nodes.filter(isVisible).map((node, index) => ({
+  // Build NodeInfo array - trust DOM order, no Y-sorting needed
+  // Use shouldIncludeInThread instead of isVisible to handle content-visibility: auto
+  // which makes offscreen elements return empty client rects
+  const nodeInfos: NodeInfo[] = nodes.filter(shouldIncludeInThread).map((node, index) => ({
     node,
     role: detectRole(node),
     id: getNodeId(node, index),
-    y: node.getBoundingClientRect().top,
+    y: index, // Use index as pseudo-Y (DOM order is correct)
     visible: true,
   }));
 
-  // Sort by Y-coordinate (should already be sorted, but ensure it)
-  nodeInfos.sort((a, b) => a.y - b.y);
-
   logDebug(`buildActiveThread: Built thread with ${nodeInfos.length} nodes (tier ${tier})`);
+
+  return nodeInfos;
+}
+
+/**
+ * Layout-read-free version of buildActiveThread for BOOT mode.
+ * Avoids getBoundingClientRect, isVisible, and other layout-triggering calls.
+ * Trusts DOM order instead of visual order (Y-coordinate sorting).
+ *
+ * This is critical for pre-paint trimming where layout reads would
+ * force the browser to compute layout before we can trim, defeating
+ * the purpose of BOOT mode.
+ *
+ * Trade-offs:
+ * - Less accurate: may include hidden elements or wrong order
+ * - Much faster: no forced layout/reflow
+ * - For BOOT mode, speed is more important than perfect accuracy
+ */
+export function buildActiveThreadFast(): NodeInfo[] {
+  const { nodes, tier } = collectCandidatesFast();
+
+  if (nodes.length < DOM.MIN_CANDIDATES) {
+    logDebug(`buildActiveThreadFast: Not enough candidates (${nodes.length})`);
+    return [];
+  }
+
+  // Build NodeInfo array without layout reads
+  // Trust DOM order - no Y-coordinate sorting
+  // Y is set to index for ordering (avoids getBoundingClientRect)
+  const nodeInfos: NodeInfo[] = nodes.map((node, index) => ({
+    node,
+    role: detectRole(node),
+    id: getNodeId(node, index),
+    y: index, // Use index as pseudo-Y to maintain DOM order
+    visible: true, // Assume visible (skip isVisible check)
+  }));
+
+  logDebug(`buildActiveThreadFast: Built thread with ${nodeInfos.length} nodes (tier ${tier})`);
 
   return nodeInfos;
 }

@@ -1,0 +1,71 @@
+/**
+ * LightSession - Early Hide CSS
+ *
+ * Phase 1: CSS containment for render optimization
+ * Phase 2: content-visibility for browsers that support it
+ *
+ * Strategy:
+ * - contain: layout paint style - works everywhere, tells browser elements are isolated
+ * - content-visibility: auto - more aggressive optimization, wrapped in @supports for Firefox 125+
+ */
+
+/* ============================================================================
+ * PHASE 1: CSS Containment (baseline - works in all browsers)
+ *
+ * `contain: layout paint style` tells the browser:
+ * - layout: element's internal layout doesn't affect external elements
+ * - paint: element's content won't paint outside its bounds
+ * - style: properties that can affect descendants are scoped
+ *
+ * This enables browser optimizations even without content-visibility.
+ * ============================================================================ */
+
+[data-message-id],
+[data-turn],
+[data-testid="conversation-turn"],
+[data-testid^="conversation-turn-"] {
+  contain: layout paint style;
+}
+
+/* ============================================================================
+ * PHASE 2: content-visibility: auto (where supported)
+ *
+ * Browser skips layout+paint for off-screen content entirely.
+ * More aggressive than contain alone.
+ *
+ * Support: Chrome 85+, Edge 85+, Firefox 125+
+ * Wrapped in @supports for graceful degradation in older Firefox.
+ *
+ * IMPORTANT: content-visibility: auto breaks getBoundingClientRect() for
+ * off-screen elements. Code must NOT rely on Y-coordinate reads.
+ * ============================================================================ */
+
+@supports (content-visibility: auto) {
+  [data-message-id],
+  [data-turn],
+  [data-testid="conversation-turn"],
+  [data-testid^="conversation-turn-"] {
+    content-visibility: auto;
+    /* Approximate message height to prevent layout shifts during scroll */
+    contain-intrinsic-size: auto 200px;
+  }
+}
+
+/* ============================================================================
+ * PHASE 3: Pre-trim hide - DISABLED
+ *
+ * NOTE: display:none blocks LCP and causes regression (+455ms).
+ * content-visibility: auto above provides the optimization without blocking LCP.
+ *
+ * Keeping the attribute mechanism for potential future use with a different
+ * approach (e.g., opacity: 0 with immediate reveal, or only hiding overflow).
+ * ============================================================================ */
+
+/* DISABLED - causes LCP regression
+html[data-ls-pretrim="1"] [data-message-id],
+html[data-ls-pretrim="1"] [data-turn],
+html[data-ls-pretrim="1"] [data-testid="conversation-turn"],
+html[data-ls-pretrim="1"] [data-testid^="conversation-turn-"] {
+  display: none !important;
+}
+*/

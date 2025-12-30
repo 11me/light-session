@@ -6,10 +6,11 @@
 import '../shared/browser-polyfill';
 import '../shared/idle-callback-polyfill';
 import type { TrimmerState, LsSettings } from '../shared/types';
+import { TIMING } from '../shared/constants';
 import { loadSettings } from '../shared/storage';
 import { setDebugMode, logInfo, logError } from '../shared/logger';
 import { findConversationRoot } from './dom-helpers';
-import { createInitialState, boot, shutdown, scheduleTrim, evaluateTrim, setOnTrimComplete } from './trimmer';
+import { createInitialState, boot, shutdown, scheduleTrim, evaluateTrim, setOnTrimComplete, maybeTransitionToSteady } from './trimmer';
 import { setStatusBarVisibility, removeStatusBar, resetAccumulatedTrimmed, showLayoutNotRecognized } from './status-bar';
 
 // Global state
@@ -18,6 +19,62 @@ let pageObserver: MutationObserver | null = null;
 let navigationCleanup: (() => void) | null = null;
 let pendingRootSync = false;
 let pendingRootSyncReason: string | null = null;
+let pretrimDisabled = false;
+let bootTransitionTimerId: number | null = null;
+
+/**
+ * Disable the pretrim CSS hide (set by early-hide.ts at document_start).
+ * Called after first trim or when extension is disabled.
+ */
+function disablePretrim(): void {
+  if (pretrimDisabled) {
+    return;
+  }
+  pretrimDisabled = true;
+
+  // Call the function set by early-hide.ts
+  if (typeof window.__lsDisablePretrim === 'function') {
+    window.__lsDisablePretrim();
+    logInfo('Pretrim hide disabled');
+  }
+}
+
+/**
+ * Schedule guaranteed BOOT→STEADY transition.
+ * This ensures transition happens even if no mutations occur.
+ * Called after boot() to set a fallback timer.
+ */
+function scheduleBootTransition(): void {
+  // Clear any existing timer
+  if (bootTransitionTimerId !== null) {
+    clearTimeout(bootTransitionTimerId);
+  }
+
+  // Schedule transition with small buffer after BOOT_DURATION_MS
+  bootTransitionTimerId = window.setTimeout(() => {
+    bootTransitionTimerId = null;
+    if (state.trimMode === 'BOOT') {
+      state = maybeTransitionToSteady(state, handleMutation);
+    }
+  }, TIMING.BOOT_DURATION_MS + 50);
+}
+
+/**
+ * Cancel scheduled BOOT transition (called on shutdown).
+ */
+function cancelBootTransition(): void {
+  if (bootTransitionTimerId !== null) {
+    clearTimeout(bootTransitionTimerId);
+    bootTransitionTimerId = null;
+  }
+}
+
+// Type declaration for the global function from early-hide.ts
+declare global {
+  interface Window {
+    __lsDisablePretrim?: () => void;
+  }
+}
 
 // Store original history methods at module level to prevent memory leak
 // from chained wrappers when navigation watcher is reinstalled
@@ -83,6 +140,7 @@ function ensureConversationBindings(reason: string): void {
  * Clean up current trimmer bindings without disabling the feature.
  */
 function teardownTrimmer(): void {
+  cancelBootTransition(); // Cancel pending BOOT→STEADY timer
   if (state.current !== 'IDLE' || state.observer || state.conversationRoot) {
     state = shutdown(state);
   }
@@ -106,6 +164,7 @@ function rebindTrimmer(reason: string): void {
   }
 
   state = boot(state, handleMutation);
+  scheduleBootTransition(); // Guarantee BOOT→STEADY even without mutations
 
   if (state.current !== 'OBSERVING' || !state.conversationRoot) {
     return;
@@ -245,6 +304,9 @@ async function initialize(): Promise<void> {
     // Set up callback to handle potentially missed mutations during trim
     // This ensures DOM is re-evaluated after observer reconnection
     setOnTrimComplete(() => {
+      // Disable pretrim hide after first successful trim
+      disablePretrim();
+
       // Only re-evaluate if trimmer is active and not already scheduled
       if (state.current === 'OBSERVING' && !state.trimScheduled) {
         handleMutation();
@@ -256,6 +318,7 @@ async function initialize(): Promise<void> {
       startRootSyncWatchers();
 
       state = boot(state, handleMutation);
+      scheduleBootTransition(); // Guarantee BOOT→STEADY even without mutations
 
       // Initialize status bar visibility
       setStatusBarVisibility(settings.showStatusBar);
@@ -266,6 +329,8 @@ async function initialize(): Promise<void> {
         requestRootSync('initialize');
       }
     } else {
+      // Extension is disabled - show messages (disable pretrim)
+      disablePretrim();
       stopRootSyncWatchers();
       removeStatusBar();
     }
@@ -281,6 +346,10 @@ async function initialize(): Promise<void> {
  */
 function handleMutation(force = false): void {
   ensureConversationBindings(force ? 'forced-trim' : 'mutation');
+
+  // Check if BOOT mode should transition to STEADY mode
+  // This happens after BOOT_DURATION_MS has elapsed since boot
+  state = maybeTransitionToSteady(state, handleMutation);
 
   // Capture settings snapshot at scheduling time to prevent race conditions
   // where settings might change between scheduling and evaluation
@@ -328,6 +397,7 @@ browser.storage.onChanged.addListener((changes, areaName) => {
     logInfo('Extension enabled, booting trimmer');
     startRootSyncWatchers();
     state = boot(state, handleMutation);
+    scheduleBootTransition(); // Guarantee BOOT→STEADY even without mutations
     setStatusBarVisibility(newSettings.showStatusBar);
 
     if (state.current === 'OBSERVING') {
@@ -336,8 +406,9 @@ browser.storage.onChanged.addListener((changes, areaName) => {
       requestRootSync('enable');
     }
   } else if (wasEnabled && !nowEnabled) {
-    // Extension was just disabled
+    // Extension was just disabled - show messages (disable pretrim)
     logInfo('Extension disabled, shutting down trimmer');
+    disablePretrim();
     stopRootSyncWatchers();
     teardownTrimmer();
     removeStatusBar();
@@ -354,7 +425,8 @@ browser.storage.onChanged.addListener((changes, areaName) => {
     requestRootSync('settings-change');
     handleMutation(forceTrim);
   } else {
-    // Remain disabled
+    // Remain disabled - ensure pretrim is disabled
+    disablePretrim();
     stopRootSyncWatchers();
     teardownTrimmer();
     removeStatusBar();

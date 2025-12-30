@@ -23,6 +23,18 @@ export const DEFAULT_SETTINGS: Readonly<LsSettings> = {
 
 export const TIMING = {
   /**
+   * Duration of BOOT mode after page load/navigation (ms).
+   *
+   * Rationale:
+   * - BOOT mode uses queueMicrotask for instant trimming before paint
+   * - 1500ms covers typical ChatGPT page load + initial render
+   * - After this, switch to STEADY mode with debouncing for efficiency
+   * - Too short: may miss initial large DOM loads
+   * - Too long: wastes CPU on frequent microtask scheduling
+   */
+  BOOT_DURATION_MS: 1500,
+
+  /**
    * Debounce delay for MutationObserver callback invocations (ms).
    *
    * Rationale:
@@ -209,4 +221,4 @@ export const VALIDATION = {
 // External URLs
 // ============================================================================
 
-export const SUPPORT_URL = 'https://github.com/11me/light-session#support' as const;
+export const SUPPORT_URL = 'https://github.com/11me/light-session?tab=readme-ov-file#%EF%B8%8F-support' as const;

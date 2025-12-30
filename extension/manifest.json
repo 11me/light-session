@@ -24,6 +24,15 @@
         "*://chat.openai.com/*",
         "*://chatgpt.com/*"
       ],
+      "css": ["dist/early-hide.css"],
+      "js": ["dist/early-hide.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "*://chat.openai.com/*",
+        "*://chatgpt.com/*"
+      ],
       "js": ["dist/content.js"],
       "run_at": "document_end"
     }

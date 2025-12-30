@@ -7,7 +7,7 @@ import type { LsSettings } from './types';
 import { DEFAULT_SETTINGS, VALIDATION } from './constants';
 import { logDebug, logError } from './logger';
 
-const STORAGE_KEY = 'ls_settings';
+export const STORAGE_KEY = 'ls_settings';
 
 /**
  * Validate and normalize settings object

@@ -41,6 +41,13 @@ export interface NodeInfo {
 export type TrimmerStateType = 'IDLE' | 'OBSERVING' | 'PENDING_TRIM' | 'TRIMMING';
 
 /**
+ * Trim mode for adaptive scheduling
+ * BOOT: Aggressive, no debounce, queueMicrotask - before first paint
+ * STEADY: Conservative, debounced, requestIdleCallback - after stabilization
+ */
+export type TrimMode = 'BOOT' | 'STEADY';
+
+/**
  * Complete trimmer state
  */
 export interface TrimmerState {
@@ -50,6 +57,8 @@ export interface TrimmerState {
   lastTrimTime: number; // performance.now() of last trim
   conversationRoot: HTMLElement | null;
   settings: LsSettings; // Cached settings (refreshed on storage change)
+  trimMode: TrimMode; // Current trim mode (BOOT or STEADY)
+  bootStartTime: number; // performance.now() when BOOT mode started
 }
 
 /**

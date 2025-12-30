@@ -23,6 +23,7 @@ function copyStaticFiles() {
   const filesToCopy = [
     { src: 'extension/src/popup/popup.html', dest: 'extension/popup/popup.html' },
     { src: 'extension/src/popup/popup.css', dest: 'extension/popup/popup.css' },
+    { src: 'extension/src/content/early-hide.css', dest: 'extension/dist/early-hide.css' },
   ];
 
   for (const { src, dest } of filesToCopy) {
@@ -30,7 +31,7 @@ function copyStaticFiles() {
       fs.copyFileSync(src, dest);
     }
   }
-  console.log('✓ Copied static files (popup.html, popup.css)');
+  console.log('✓ Copied static files (popup.html, popup.css, early-hide.css)');
 }
 
 const buildOptions = {
@@ -61,6 +62,13 @@ async function build() {
       outfile: 'extension/dist/background.js',
     });
     console.log('✓ Built background script');
+
+    await esbuild.build({
+      ...buildOptions,
+      entryPoints: ['extension/src/content/early-hide.ts'],
+      outfile: 'extension/dist/early-hide.js',
+    });
+    console.log('✓ Built early-hide script');
 
     await esbuild.build({
       ...buildOptions,
@@ -96,6 +104,11 @@ async function watch() {
     }),
     esbuild.context({
       ...buildOptions,
+      entryPoints: ['extension/src/content/early-hide.ts'],
+      outfile: 'extension/dist/early-hide.js',
+    }),
+    esbuild.context({
+      ...buildOptions,
       entryPoints: ['extension/src/content/content.ts'],
       outfile: 'extension/dist/content.js',
     }),
@@ -119,7 +132,11 @@ async function watch() {
   }
 
   // Watch static files manually
-  const staticFiles = ['extension/src/popup/popup.html', 'extension/src/popup/popup.css'];
+  const staticFiles = [
+    'extension/src/popup/popup.html',
+    'extension/src/popup/popup.css',
+    'extension/src/content/early-hide.css',
+  ];
   for (const file of staticFiles) {
     fs.watchFile(file, { interval: 500 }, () => {
       console.log(`📄 ${path.basename(file)} changed`);
