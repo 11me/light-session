@@ -31,19 +31,23 @@ function getOptionalElement<T extends HTMLElement>(id: string): T | null {
 let enableToggle: HTMLInputElement;
 let keepSlider: HTMLInputElement;
 let keepValue: HTMLElement;
+let sliderTrackFill: HTMLElement;
 let showStatusBarCheckbox: HTMLInputElement | null;
-let ultraLeanCheckbox: HTMLInputElement | null;
 let debugCheckbox: HTMLInputElement | null;
 let debugGroup: HTMLElement | null;
-let refreshButton: HTMLButtonElement;
 let statusElement: HTMLElement;
 let supportLink: HTMLButtonElement;
+let retentionCard: HTMLElement | null;
+let optionsCard: HTMLElement | null;
 
 // Debounce/throttle state for slider persistence
 let sliderDebounceTimeout: number | null = null;
 let pendingKeepValue: number | null = null;
 let lastKeepUpdateTimestamp = 0;
 const SLIDER_SAVE_THROTTLE_MS = 150;
+
+// Status message timeout state
+let statusClearTimeout: number | null = null;
 
 /**
  * Schedule updating the keep setting with optional immediate flush
@@ -95,6 +99,17 @@ function scheduleKeepUpdate(value: number, immediate: boolean = false): void {
 }
 
 /**
+ * Update slider track fill width based on current value
+ */
+function updateSliderTrackFill(): void {
+  const min = parseInt(keepSlider.min, 10);
+  const max = parseInt(keepSlider.max, 10);
+  const value = parseInt(keepSlider.value, 10);
+  const percentage = ((value - min) / (max - min)) * 100;
+  sliderTrackFill.style.width = `${percentage}%`;
+}
+
+/**
  * Check if running in development mode
  */
 async function isDevMode(): Promise<boolean> {
@@ -115,15 +130,16 @@ async function initialize(): Promise<void> {
   enableToggle = getRequiredElement<HTMLInputElement>('enableToggle');
   keepSlider = getRequiredElement<HTMLInputElement>('keepSlider');
   keepValue = getRequiredElement<HTMLElement>('keepValue');
-  refreshButton = getRequiredElement<HTMLButtonElement>('refreshButton');
+  sliderTrackFill = getRequiredElement<HTMLElement>('sliderTrackFill');
   statusElement = getRequiredElement<HTMLElement>('status');
   supportLink = getRequiredElement<HTMLButtonElement>('supportLink');
 
   // Get optional UI elements (may not exist in all configurations)
   showStatusBarCheckbox = getOptionalElement<HTMLInputElement>('showStatusBarCheckbox');
-  ultraLeanCheckbox = getOptionalElement<HTMLInputElement>('ultraLeanCheckbox');
   debugCheckbox = getOptionalElement<HTMLInputElement>('debugCheckbox');
   debugGroup = getOptionalElement<HTMLElement>('debugGroup');
+  retentionCard = getOptionalElement<HTMLElement>('retentionCard');
+  optionsCard = getOptionalElement<HTMLElement>('optionsCard');
 
   // Check if dev mode and show debug options
   const devMode = await isDevMode();
@@ -145,16 +161,21 @@ async function initialize(): Promise<void> {
   enableToggle.addEventListener('change', handleEnableToggle);
   keepSlider.addEventListener('input', handleKeepSliderInput);
   keepSlider.addEventListener('change', handleKeepSliderChange);
+
+  // Slider visual feedback
+  keepSlider.addEventListener('mousedown', () => {
+    keepValue.classList.add('is-dragging');
+  });
+  keepSlider.addEventListener('mouseup', () => {
+    keepValue.classList.remove('is-dragging');
+  });
+
   if (showStatusBarCheckbox) {
     showStatusBarCheckbox.addEventListener('change', handleShowStatusBarToggle);
-  }
-  if (ultraLeanCheckbox) {
-    ultraLeanCheckbox.addEventListener('change', handleUltraLeanToggle);
   }
   if (debugCheckbox) {
     debugCheckbox.addEventListener('change', handleDebugToggle);
   }
-  refreshButton.addEventListener('click', () => void handleRefreshClick());
   supportLink.addEventListener('click', handleSupportClick);
 }
 
@@ -174,12 +195,10 @@ async function loadSettings(): Promise<void> {
     keepSlider.value = settings.keep.toString();
     keepValue.textContent = settings.keep.toString();
     keepSlider.setAttribute('aria-valuenow', settings.keep.toString());
+    updateSliderTrackFill();
 
     if (showStatusBarCheckbox) {
       showStatusBarCheckbox.checked = settings.showStatusBar;
-    }
-    if (ultraLeanCheckbox) {
-      ultraLeanCheckbox.checked = settings.ultraLean;
     }
     if (debugCheckbox) {
       debugCheckbox.checked = settings.debug;
@@ -231,6 +250,7 @@ function handleKeepSliderInput(): void {
   const value = parseInt(keepSlider.value, 10);
   keepValue.textContent = value.toString();
   keepSlider.setAttribute('aria-valuenow', value.toString());
+  updateSliderTrackFill();
   scheduleKeepUpdate(value);
 }
 
@@ -252,52 +272,11 @@ function handleShowStatusBarToggle(): void {
 }
 
 /**
- * Handle Ultra Lean mode toggle
- */
-function handleUltraLeanToggle(): void {
-  if (ultraLeanCheckbox) {
-    void updateSettings({ ultraLean: ultraLeanCheckbox.checked });
-    showStatus(ultraLeanCheckbox.checked ? 'Ultra Lean enabled' : 'Ultra Lean disabled');
-  }
-}
-
-/**
  * Handle debug mode toggle
  */
 function handleDebugToggle(): void {
   if (debugCheckbox) {
     void updateSettings({ debug: debugCheckbox.checked });
-  }
-}
-
-/**
- * Handle refresh button click
- */
-async function handleRefreshClick(): Promise<void> {
-  try {
-    // Get active tab
-    const tabs = await browser.tabs.query({ active: true, currentWindow: true });
-    const tab = tabs[0];
-
-    if (!tab) {
-      showStatus('No active tab found', true);
-      return;
-    }
-
-    // Check if it's a ChatGPT tab
-    if (tab.url && (tab.url.includes('chat.openai.com') || tab.url.includes('chatgpt.com'))) {
-      if (tab.id !== undefined) {
-        await browser.tabs.reload(tab.id);
-        showStatus('Page refreshed');
-      } else {
-        showStatus('Invalid tab ID', true);
-      }
-    } else {
-      showStatus('Not a ChatGPT tab', true);
-    }
-  } catch (error) {
-    showStatus('Failed to refresh page', true);
-    console.error('Failed to refresh:', error);
   }
 }
 
@@ -312,11 +291,17 @@ function handleSupportClick(): void {
  * Show status message
  */
 function showStatus(message: string, isError: boolean = false): void {
+  // Clear previous timeout to prevent race conditions
+  if (statusClearTimeout !== null) {
+    clearTimeout(statusClearTimeout);
+  }
+
   statusElement.textContent = message;
   statusElement.classList.toggle('error', isError);
 
   // Clear after 3 seconds
-  setTimeout(() => {
+  statusClearTimeout = window.setTimeout(() => {
+    statusClearTimeout = null;
     statusElement.textContent = '';
     statusElement.classList.remove('error');
   }, 3000);
@@ -326,17 +311,14 @@ function showStatus(message: string, isError: boolean = false): void {
  * Update disabled state of settings based on enabled toggle
  */
 function updateDisabledState(enabled: boolean): void {
-  const settingGroups = document.querySelectorAll('.setting-group');
-  for (let i = 1; i < settingGroups.length - 1; i++) {
-    // Skip first (toggle) and last (refresh button)
-    const group = settingGroups[i];
-    if (!group) {
-      continue;
-    }
+  // Toggle disabled class on cards
+  const cards = [retentionCard, optionsCard];
+  for (const card of cards) {
+    if (!card) continue;
     if (enabled) {
-      group.classList.remove('disabled');
+      card.classList.remove('disabled');
     } else {
-      group.classList.add('disabled');
+      card.classList.add('disabled');
     }
   }
 }

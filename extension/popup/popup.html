@@ -7,91 +7,119 @@
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <div class="container">
-    <header>
-      <h1>LightSession</h1>
-      <p class="subtitle">ChatGPT Performance Optimizer</p>
+  <div class="ls-popup">
+    <!-- Header with gradient and master toggle -->
+    <header class="ls-header">
+      <div class="ls-header-content">
+        <div class="ls-logo">
+          <h1>LightSession</h1>
+          <p class="ls-subtitle">ChatGPT Performance Optimizer</p>
+        </div>
+        <!-- Master toggle in header -->
+        <div class="ls-master-toggle">
+          <input type="checkbox" id="enableToggle" class="ls-toggle-input" aria-label="Enable extension">
+          <label for="enableToggle" class="ls-toggle-track">
+            <span class="ls-toggle-thumb"></span>
+          </label>
+        </div>
+      </div>
+      <div class="ls-header-accent"></div>
     </header>
 
-    <main>
-      <!-- Enable/Disable Toggle -->
-      <div class="setting-group">
-        <label class="toggle-container">
-          <input type="checkbox" id="enableToggle" aria-label="Enable extension">
-          <span class="toggle-slider"></span>
-          <span class="toggle-label">Extension Enabled</span>
-        </label>
-        <p class="setting-description">Toggle trimming on/off</p>
-      </div>
-
-      <!-- Message Retention Slider -->
-      <div class="setting-group">
-        <label for="keepSlider">
-          Keep last <strong id="keepValue">10</strong> messages
-        </label>
-        <input
-          type="range"
-          id="keepSlider"
-          min="1"
-          max="100"
-          value="10"
-          aria-label="Number of messages to keep"
-          aria-valuemin="1"
-          aria-valuemax="100"
-          aria-valuenow="10"
-        >
-        <div class="slider-labels">
-          <span>1</span>
-          <span>50</span>
-          <span>100</span>
+    <main class="ls-main">
+      <!-- Card: Message Retention -->
+      <section class="ls-card" id="retentionCard">
+        <div class="ls-card-header">
+          <span class="ls-card-title">Message Retention</span>
         </div>
-        <p class="setting-description">Adjust how many recent messages to display</p>
-      </div>
+        <div class="ls-card-content">
+          <div class="ls-slider-container">
+            <label class="ls-slider-header" for="keepSlider">
+              <span class="ls-slider-label">Keep last</span>
+              <span class="ls-slider-value" id="keepValue">10</span>
+              <span class="ls-slider-label">turns</span>
+            </label>
+            <div class="ls-slider-track-wrapper">
+              <input
+                type="range"
+                id="keepSlider"
+                class="ls-slider"
+                min="1"
+                max="100"
+                value="10"
+                aria-label="Number of messages to keep"
+                aria-valuemin="1"
+                aria-valuemax="100"
+                aria-valuenow="10"
+              >
+              <div class="ls-slider-track-fill" id="sliderTrackFill"></div>
+            </div>
+            <div class="ls-slider-labels">
+              <span>1</span>
+              <span>50</span>
+              <span>100</span>
+            </div>
+          </div>
+        </div>
+      </section>
 
-      <!-- Show Status Bar -->
-      <div class="setting-group">
-        <label class="checkbox-container">
-          <input type="checkbox" id="showStatusBarCheckbox" aria-label="Show status bar">
-          <span class="checkbox-label">Show status bar</span>
-        </label>
-        <p class="setting-description">Display trimming statistics on the ChatGPT page</p>
-      </div>
+      <!-- Card: Options -->
+      <section class="ls-card" id="optionsCard">
+        <div class="ls-card-header">
+          <span class="ls-card-title">Options</span>
+        </div>
+        <div class="ls-card-content">
+          <!-- Show Status Bar -->
+          <label class="ls-checkbox-row">
+            <div class="ls-checkbox-wrapper">
+              <input type="checkbox" id="showStatusBarCheckbox" class="ls-checkbox-input" aria-label="Show status bar">
+              <div class="ls-checkbox-box">
+                <svg class="ls-checkbox-check" viewBox="0 0 12 12" fill="none">
+                  <path d="M2 6l3 3 5-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+            </div>
+            <div class="ls-checkbox-label-group">
+              <span class="ls-checkbox-label">Show status bar</span>
+              <span class="ls-checkbox-description">Display trimming stats on page</span>
+            </div>
+          </label>
 
-      <!-- Ultra Lean Mode -->
-      <div class="setting-group">
-        <label class="checkbox-container">
-          <input type="checkbox" id="ultraLeanCheckbox" aria-label="Enable Ultra Lean mode">
-          <span class="checkbox-label">Ultra Lean Mode <span class="experimental-badge">Experimental</span></span>
-        </label>
-        <p class="setting-description">Aggressive performance mode: kills animations, reduces input lag, dehighlights old code blocks</p>
-      </div>
+        </div>
+      </section>
 
-      <!-- Debug Mode (only shown in dev mode) -->
-      <div class="setting-group" id="debugGroup" style="display: none;">
-        <label class="checkbox-container">
-          <input type="checkbox" id="debugCheckbox" aria-label="Enable debug logging">
-          <span class="checkbox-label">Debug mode</span>
-        </label>
-        <p class="setting-description">Show debug logs in browser console</p>
-      </div>
-
-      <!-- Refresh Button -->
-      <div class="setting-group">
-        <button id="refreshButton" class="refresh-button">
-          Refresh to restore full history
-        </button>
-        <p class="setting-description">Reload ChatGPT page to see all messages</p>
-      </div>
-
+      <!-- Card: Debug (dev only) -->
+      <section class="ls-card ls-card-debug" id="debugGroup" style="display: none;">
+        <div class="ls-card-header">
+          <span class="ls-card-title">Developer</span>
+        </div>
+        <div class="ls-card-content">
+          <label class="ls-checkbox-row">
+            <div class="ls-checkbox-wrapper">
+              <input type="checkbox" id="debugCheckbox" class="ls-checkbox-input" aria-label="Enable debug logging">
+              <div class="ls-checkbox-box">
+                <svg class="ls-checkbox-check" viewBox="0 0 12 12" fill="none">
+                  <path d="M2 6l3 3 5-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+            </div>
+            <div class="ls-checkbox-label-group">
+              <span class="ls-checkbox-label">Debug mode</span>
+              <span class="ls-checkbox-description">Show logs in console</span>
+            </div>
+          </label>
+        </div>
+      </section>
     </main>
 
-    <footer>
-      <div id="status" class="status" role="status" aria-live="polite"></div>
-      <button class="ls-footer-support" id="supportLink">
-        <span class="ls-footer-heart">❤️</span>
-        <span>Support LightSession</span>
+    <!-- Footer -->
+    <footer class="ls-footer">
+      <div id="status" class="ls-status" role="status" aria-live="polite"></div>
+      <button class="ls-button-support" id="supportLink">
+        <span class="ls-support-heart">❤</span>
+        <span>Support Development</span>
       </button>
-      <span class="version" id="version"></span>
+      <span class="ls-version" id="version"></span>
     </footer>
   </div>
 
