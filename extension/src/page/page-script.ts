@@ -178,6 +178,10 @@ function trimMapping(data: ConversationData, limit: number): TrimResult | null {
   // Find cut point by counting TURNS (role transitions), not individual nodes
   // A turn is a contiguous sequence of messages from the same role
   // This matches how ChatGPT renders messages (multiple nodes = 1 bubble)
+  //
+  // We iterate backwards (newest to oldest) and count turns on role changes.
+  // When we've counted N turns and see a NEW turn (N+1), we break.
+  // cutIndex = i+1 ensures we keep all nodes of the Nth turn.
   let turnCount = 0;
   let cutIndex = 0;
   let lastRole: string | null = null;
@@ -194,8 +198,10 @@ function trimMapping(data: ConversationData, limit: number): TrimResult | null {
         turnCount++;
         lastRole = role;
       }
-      if (turnCount >= effectiveLimit) {
-        cutIndex = i;
+      // Break when we've EXCEEDED the limit (entering turn N+1)
+      // This ensures all nodes of turn N are included
+      if (turnCount > effectiveLimit) {
+        cutIndex = i + 1; // Start from the first node of the Nth turn
         break;
       }
     }
@@ -213,23 +219,39 @@ function trimMapping(data: ConversationData, limit: number): TrimResult | null {
     return null;
   }
 
-  // Build new mapping with only kept nodes
+  // Preserve original root node - ChatGPT needs this "(no role)" node as tree anchor
+  const originalRootId = path[0];
+  const originalRootNode = originalRootId ? mapping[originalRootId] : null;
+  const hasOriginalRoot = originalRootId && originalRootNode;
+
+  // Build new mapping with kept nodes + original root
   const newMapping: ChatMapping = {};
   let turnsKept = 0;
   let prevRole: string | null = null;
 
+  // Add original root node first (the "(no role)" anchor node)
+  if (hasOriginalRoot) {
+    newMapping[originalRootId] = {
+      ...originalRootNode,
+      parent: null,
+      children: kept[0] ? [kept[0]] : [],
+    };
+  }
+
+  // Add kept visible nodes
   for (let i = 0; i < kept.length; i++) {
     const id = kept[i];
     if (!id) continue;
 
-    const prevId = kept[i - 1] ?? null;
+    // First kept node's parent is originalRoot (if exists), otherwise null
+    const prevId = i === 0 ? (hasOriginalRoot ? originalRootId : null) : kept[i - 1];
     const nextId = kept[i + 1] ?? null;
     const originalNode = mapping[id];
 
     if (originalNode) {
       newMapping[id] = {
         ...originalNode,
-        parent: prevId,
+        parent: prevId ?? null,
         children: nextId ? [nextId] : [],
       };
       // Count turns (role transitions) for accurate display
@@ -243,7 +265,8 @@ function trimMapping(data: ConversationData, limit: number): TrimResult | null {
 
   const visibleKept = turnsKept;
 
-  const newRoot = kept[0];
+  // Use original root if available, otherwise first kept node
+  const newRoot = hasOriginalRoot ? originalRootId : kept[0];
   const newCurrentNode = kept[kept.length - 1];
 
   // These should always be defined since kept.length > 0, but TypeScript needs assurance
@@ -304,9 +327,9 @@ function getConfig(): LsConfig {
 /**
  * Check if this is a conversation API request we should intercept
  */
-function isConversationRequest(req: Request, url: URL): boolean {
+function isConversationRequest(method: string, url: URL): boolean {
   // Only GET requests
-  if (req.method !== 'GET') {
+  if (method !== 'GET') {
     return false;
   }
 
@@ -370,22 +393,40 @@ async function interceptedFetch(
   ...args: Parameters<typeof fetch>
 ): Promise<Response> {
   const cfg = getConfig();
-  const res = await nativeFetch(...args);
 
   // Skip if disabled
   if (!cfg.enabled) {
-    return res;
+    return nativeFetch(...args);
   }
 
+  // Extract URL/method BEFORE fetching (handles string, URL, Request)
+  // This avoids "Body has already been consumed" error when args[0] is a Request
+  const [input, init] = args;
+  let urlString: string;
+  let method: string;
+
+  if (input instanceof Request) {
+    urlString = input.url;
+    method = (init?.method ?? input.method).toUpperCase();
+  } else if (input instanceof URL) {
+    urlString = input.href;
+    method = (init?.method ?? 'GET').toUpperCase();
+  } else {
+    urlString = String(input);
+    method = (init?.method ?? 'GET').toUpperCase();
+  }
+
+  const url = new URL(urlString, location.href);
+
+  // Early return for non-matching requests (before fetching)
+  if (!isConversationRequest(method, url)) {
+    return nativeFetch(...args);
+  }
+
+  // Fetch and process matching requests
+  const res = await nativeFetch(...args);
+
   try {
-    // Check if this is a request we should intercept
-    const req = new Request(...args);
-    const url = new URL(req.url, location.href);
-
-    if (!isConversationRequest(req, url)) {
-      return res;
-    }
-
     if (!isJsonResponse(res)) {
       return res;
     }
@@ -434,10 +475,8 @@ async function interceptedFetch(
       current_node: trimmed.current_node,
     };
 
-    // Preserve root if it was in original data
-    if ('root' in json) {
-      modifiedData.root = trimmed.root;
-    }
+    // Always set root - ChatGPT needs this to know where to start rendering
+    modifiedData.root = trimmed.root;
 
     return createModifiedResponse(res, modifiedData);
   } catch (error) {

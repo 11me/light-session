@@ -41,15 +41,16 @@ content.ts → dispatches settings via CustomEvent → receives status updates
 1. Page script intercepts GET `/backend-api/` JSON responses
 2. Parses conversation `mapping` and `current_node`
 3. Builds path from current_node to root via parent links
-4. Counts TURNS (role transitions), not individual nodes
-5. Keeps last N turns, filters to user/assistant only
+4. Counts MESSAGES (role transitions), not individual nodes
+5. Keeps last N messages, filters to user/assistant only
 6. Returns modified Response with trimmed JSON
 
-### Turn-Based Counting
+### Message-Based Counting
 
 ChatGPT creates multiple nodes per assistant response (especially with Extended Thinking).
-LightSession counts **turns** (role changes) instead of nodes:
-- `[user, assistant, assistant, user, assistant]` = 4 turns
+LightSession counts **messages** (role changes) instead of nodes:
+- `[user, assistant, assistant, user, assistant]` = 4 messages
+- Consecutive same-role nodes are aggregated as ONE message
 - HIDDEN_ROLES: `system`, `tool`, `thinking` excluded from count
 
 ## Project Structure

@@ -36,8 +36,8 @@ Built after too many coding sessions where a single ChatGPT tab would start eati
 **Performance**
 
 - **Fetch Proxy** – intercepts API responses and trims JSON before React renders (no flash of untrimmed content)
-- **Turn-based counting** – counts conversation turns (user→assistant), not individual nodes, for accurate message limits
-- **Automatic trimming** – keeps only the last _N_ conversation turns visible (configurable range: 1–100)
+- **Message-based counting** – counts conversation messages (aggregated by role), not individual nodes, for accurate limits
+- **Automatic trimming** – keeps only the last _N_ messages visible (configurable range: 1–100)
 - **Ultra Lean Mode** _(Experimental)_ – aggressive CSS optimizations: kills animations, applies containment
 
 **User experience**
@@ -152,10 +152,10 @@ LightSession uses a **Fetch Proxy** architecture:
 
 1. **Injection** – at `document_start`, injects a script into the page context before ChatGPT loads.
 2. **Interception** – patches `window.fetch` to intercept `/backend-api/` JSON responses.
-3. **Trimming** – parses the conversation mapping, counts turns (role transitions), keeps the last N turns.
+3. **Trimming** – parses the conversation mapping, counts messages (role transitions), keeps the last N messages.
 4. **Response** – returns a modified Response with trimmed JSON; React renders only kept messages.
 
-**Turn counting**: A "turn" is a contiguous sequence of messages from the same role. This matches how ChatGPT renders messages — multiple assistant nodes may render as a single bubble.
+**Message counting**: A "message" is a contiguous sequence of nodes from the same role. Consecutive assistant nodes (e.g., from Extended Thinking) are aggregated as ONE message.
 
 Trimming only affects what the browser renders. The conversation itself remains on OpenAI's side and is fully recoverable by reloading the page.
 
@@ -221,9 +221,9 @@ extension/
 ### Architecture
 
 - **Fetch Proxy** – patches `window.fetch` in page context to intercept API responses
-- **Turn-based trimming** – counts role transitions, not individual nodes
+- **Message-based trimming** – counts role transitions (aggregated messages), not individual nodes
 - **Content ↔ Page communication** – CustomEvents for settings dispatch and status updates
-- **HIDDEN_ROLES** – system, tool, thinking nodes excluded from turn count
+- **HIDDEN_ROLES** – system, tool, thinking nodes excluded from message count
 
 ---
 

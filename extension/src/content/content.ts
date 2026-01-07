@@ -51,6 +51,13 @@ let proxyReady = false;
 /**
  * Dispatch configuration to the page script via CustomEvent.
  * The page script listens for 'lightsession-config' events.
+ *
+ * In Firefox, content scripts run in an isolated sandbox. Objects created
+ * in this sandbox are not accessible from page context due to Xray vision.
+ * We use cloneInto() to clone the config object into the page context,
+ * making it accessible to the page script.
+ *
+ * @see https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Sharing_objects_with_page_scripts
  */
 function dispatchConfig(settings: LsSettings): void {
   const config: PageScriptConfig = {
@@ -59,9 +66,12 @@ function dispatchConfig(settings: LsSettings): void {
     debug: settings.debug,
   };
 
-  window.dispatchEvent(
-    new CustomEvent('lightsession-config', { detail: config })
-  );
+  // Clone config into page context for Firefox (Xray vision workaround)
+  // cloneInto is a Firefox-specific API, check for availability
+  const detail =
+    typeof cloneInto === 'function' ? cloneInto(config, window) : config;
+
+  window.dispatchEvent(new CustomEvent('lightsession-config', { detail }));
 
   logDebug('Dispatched config to page script:', config);
 }
