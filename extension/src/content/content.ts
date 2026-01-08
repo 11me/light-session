@@ -21,6 +21,17 @@ import {
 } from './status-bar';
 
 // ============================================================================
+// Firefox-specific Global Declarations
+// ============================================================================
+
+/**
+ * Firefox's cloneInto() function for Xray vision workaround.
+ * Clones objects from content script context into page context.
+ * @see https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Sharing_objects_with_page_scripts
+ */
+declare function cloneInto<T>(obj: T, targetScope: Window): T;
+
+// ============================================================================
 // Types for Page Script Communication
 // ============================================================================
 
