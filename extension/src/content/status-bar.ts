@@ -3,6 +3,8 @@
  * Compact floating pill indicator showing trimming statistics
  */
 
+import { TIMING } from '../shared/constants';
+
 const STATUS_BAR_ID = 'lightsession-status-bar';
 
 export interface StatusBarStats {
@@ -19,7 +21,6 @@ let isVisible = true;
 let accumulatedTrimmed = 0;
 
 // Throttle status bar updates to reduce DOM writes during active chat
-const STATUS_BAR_THROTTLE_MS = 500;
 let lastUpdateTime = 0;
 let pendingStats: StatusBarStats | null = null;
 let pendingUpdateTimer: number | null = null;
@@ -197,7 +198,7 @@ export function updateStatusBar(stats: StatusBarStats): void {
   const now = performance.now();
   const elapsed = now - lastUpdateTime;
 
-  if (elapsed >= STATUS_BAR_THROTTLE_MS) {
+  if (elapsed >= TIMING.STATUS_BAR_THROTTLE_MS) {
     // Enough time passed, render immediately
     if (pendingUpdateTimer !== null) {
       clearTimeout(pendingUpdateTimer);
@@ -209,7 +210,7 @@ export function updateStatusBar(stats: StatusBarStats): void {
     // Too soon, schedule pending update
     pendingStats = displayStats;
     if (pendingUpdateTimer === null) {
-      const delay = STATUS_BAR_THROTTLE_MS - elapsed;
+      const delay = TIMING.STATUS_BAR_THROTTLE_MS - elapsed;
       pendingUpdateTimer = window.setTimeout(() => {
         pendingUpdateTimer = null;
         if (pendingStats && isVisible) {

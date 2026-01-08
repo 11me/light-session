@@ -28,7 +28,6 @@ describe('validateSettings', () => {
     expect(result.showStatusBar).toBe(DEFAULT_SETTINGS.showStatusBar);
     expect(result.debug).toBe(DEFAULT_SETTINGS.debug);
     expect(result.ultraLean).toBe(DEFAULT_SETTINGS.ultraLean);
-    expect(result.hideMedia).toBe(DEFAULT_SETTINGS.hideMedia);
   });
 
   it('preserves valid settings values', () => {
@@ -38,7 +37,6 @@ describe('validateSettings', () => {
       showStatusBar: false,
       debug: true,
       ultraLean: true,
-      hideMedia: true,
     };
 
     const result = validateSettings(input);
@@ -48,7 +46,6 @@ describe('validateSettings', () => {
     expect(result.showStatusBar).toBe(false);
     expect(result.debug).toBe(true);
     expect(result.ultraLean).toBe(true);
-    expect(result.hideMedia).toBe(true);
   });
 
   it('clamps keep value to MIN_KEEP when below minimum', () => {

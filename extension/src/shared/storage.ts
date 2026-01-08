@@ -24,7 +24,6 @@ export function validateSettings(input: Partial<LsSettings>): LsSettings {
     showStatusBar: input.showStatusBar ?? DEFAULT_SETTINGS.showStatusBar,
     debug: input.debug ?? DEFAULT_SETTINGS.debug,
     ultraLean: input.ultraLean ?? DEFAULT_SETTINGS.ultraLean,
-    hideMedia: input.hideMedia ?? DEFAULT_SETTINGS.hideMedia,
   };
 }
 

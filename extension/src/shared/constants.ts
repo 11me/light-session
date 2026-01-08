@@ -16,7 +16,6 @@ export const DEFAULT_SETTINGS: Readonly<LsSettings> = {
   showStatusBar: true,
   debug: false,
   ultraLean: false,
-  hideMedia: false,
 } as const;
 
 // ============================================================================
@@ -99,6 +98,16 @@ export const TIMING = {
    * - If timeout fires, proxy may still work (just missed the signal)
    */
   PROXY_READY_TIMEOUT_MS: 1000,
+
+  /**
+   * Throttle interval for status bar DOM updates (ms).
+   *
+   * Rationale:
+   * - 500ms reduces DOM writes during active chat streaming
+   * - Prevents excessive repaints while still feeling responsive
+   * - Status bar is informational, doesn't need real-time updates
+   */
+  STATUS_BAR_THROTTLE_MS: 500,
 } as const;
 
 // ============================================================================
