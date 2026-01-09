@@ -5,19 +5,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build & Test Commands
 
 ```bash
-npm install          # Install dependencies
-npm run build        # Build extension (esbuild)
-npm run dev          # Run in Firefox Developer Edition with auto-reload
-npm run test         # Run unit tests (vitest)
-npm run test:watch   # Run tests in watch mode
-npm run lint         # ESLint check
-npm run lint:fix     # ESLint autofix
-npm run build:types  # TypeScript type check (no emit)
+npm install            # Install dependencies
+npm run build          # Build for Firefox (default)
+npm run build:firefox  # Build for Firefox
+npm run build:chrome   # Build for Chrome
+npm run dev            # Run in Firefox Developer Edition
+npm run watch:chrome   # Watch mode for Chrome development
+npm run test           # Run unit tests (vitest)
+npm run lint           # ESLint check
+npm run build:types    # TypeScript type check
+npm run package        # Package for Firefox (web-ext-artifacts/)
+npm run package:chrome # Package for Chrome (ZIP)
 ```
 
 ## Architecture
 
-**Firefox extension (Manifest V3)** that uses Fetch Proxy to trim ChatGPT conversations before React renders.
+**Cross-browser extension (Manifest V3)** for Firefox and Chrome that uses Fetch Proxy to trim ChatGPT conversations before React renders.
 
 ### Core Components
 
@@ -48,7 +51,7 @@ content.ts → dispatches settings via CustomEvent → receives status updates
 ### Message-Based Counting
 
 ChatGPT creates multiple nodes per assistant response (especially with Extended Thinking).
-LightSession counts **messages** (role changes) instead of nodes:
+LightSession Pro counts **messages** (role changes) instead of nodes:
 - `[user, assistant, assistant, user, assistant]` = 4 messages
 - Consecutive same-role nodes are aggregated as ONE message
 - HIDDEN_ROLES: `system`, `tool`, `thinking` excluded from count
@@ -56,14 +59,18 @@ LightSession counts **messages** (role changes) instead of nodes:
 ## Project Structure
 
 ```
-extension/src/
-├── page/            # Page script (Fetch Proxy, runs in page context)
-├── content/         # Content scripts (settings, status bar)
-├── background/      # Background service worker
-├── popup/           # Popup HTML/CSS/TS
-└── shared/          # Types, constants, storage, logger
-tests/               # Unit tests (vitest + happy-dom)
-build.cjs            # esbuild build script (CommonJS)
+extension/
+├── manifest.json          # Symlink → manifest.firefox.json (or chrome copy)
+├── manifest.firefox.json  # Firefox-specific manifest
+├── manifest.chrome.json   # Chrome-specific manifest
+└── src/
+    ├── page/              # Page script (Fetch Proxy, runs in page context)
+    ├── content/           # Content scripts (settings, status bar)
+    ├── background/        # Background service worker
+    ├── popup/             # Popup HTML/CSS/TS
+    └── shared/            # Types, constants, storage, logger
+tests/                     # Unit tests (vitest + happy-dom)
+build.cjs                  # esbuild build script (supports --target=firefox|chrome)
 ```
 
 ## Conventions

@@ -49,3 +49,4 @@ extension/.dev
 *.tmp
 *.temp
 .serena/
+extension/manifest.json

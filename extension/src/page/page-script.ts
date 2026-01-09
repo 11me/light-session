@@ -48,6 +48,33 @@ const DEFAULT_CONFIG: LsConfig = {
   debug: false,
 };
 
+/**
+ * localStorage key - must match storage.ts LOCAL_STORAGE_KEY
+ */
+const LOCAL_STORAGE_KEY = 'ls_config';
+
+/**
+ * Load config from localStorage (synced by content script).
+ * This eliminates race conditions where fetch happens before
+ * content script can send config via CustomEvent.
+ */
+function loadFromLocalStorage(): LsConfig | null {
+  try {
+    const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored) as Partial<LsConfig>;
+      return {
+        enabled: parsed.enabled ?? DEFAULT_CONFIG.enabled,
+        limit: Math.max(1, parsed.limit ?? DEFAULT_CONFIG.limit),
+        debug: parsed.debug ?? DEFAULT_CONFIG.debug,
+      };
+    }
+  } catch {
+    // localStorage unavailable or invalid JSON
+  }
+  return null;
+}
+
 // ============================================================================
 // Logging
 // ============================================================================
@@ -80,12 +107,26 @@ function dispatchStatus(status: TrimStatus): void {
  * Get current config (with defaults)
  */
 function getConfig(): LsConfig {
+  // Always check localStorage first (source of truth, synced by content scripts)
+  // This ensures we pick up settings even if they were synced after page-script loaded
+  const stored = loadFromLocalStorage();
+  if (stored) {
+    // Update window cache for consistency
+    window.__LS_CONFIG__ = stored;
+    return stored;
+  }
+  
+  // Fall back to window config (set by content script events)
   const cfg = window.__LS_CONFIG__;
-  return {
-    enabled: cfg?.enabled ?? DEFAULT_CONFIG.enabled,
-    limit: Math.max(1, cfg?.limit ?? DEFAULT_CONFIG.limit),
-    debug: cfg?.debug ?? DEFAULT_CONFIG.debug,
-  };
+  if (cfg) {
+    return {
+      enabled: cfg.enabled ?? DEFAULT_CONFIG.enabled,
+      limit: Math.max(1, cfg.limit ?? DEFAULT_CONFIG.limit),
+      debug: cfg.debug ?? DEFAULT_CONFIG.debug,
+    };
+  }
+  
+  return DEFAULT_CONFIG;
 }
 
 /**
@@ -282,11 +323,28 @@ function patchFetch(): void {
 }
 
 /**
- * Listen for config updates from content script
+ * Listen for config updates from content script.
+ * Config is received as JSON string for cross-browser compatibility.
  */
 function setupConfigListener(): void {
-  window.addEventListener('lightsession-config', ((event: CustomEvent<LsConfig>) => {
-    const config = event.detail;
+  window.addEventListener('lightsession-config', ((event: CustomEvent<string>) => {
+    const detail = event.detail;
+
+    // Parse JSON string (content script serializes config for Chrome compatibility)
+    let config: LsConfig | null = null;
+
+    if (typeof detail === 'string') {
+      try {
+        config = JSON.parse(detail) as LsConfig;
+      } catch {
+        // Invalid JSON, ignore
+        return;
+      }
+    } else if (detail && typeof detail === 'object') {
+      // Fallback: handle object directly (backwards compatibility)
+      config = detail as unknown as LsConfig;
+    }
+
     if (config && typeof config === 'object') {
       // Update debug flag first so logging works immediately
       window.__LS_DEBUG__ = config.debug ?? false;

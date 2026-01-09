@@ -1,0 +1,57 @@
+{
+  "manifest_version": 3,
+  "name": "LightSession Pro",
+  "version": "1.6.1",
+  "description": "Keep ChatGPT fast by keeping only the last N messages in the DOM. Local-only.",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_title": "LightSession Pro",
+    "default_popup": "popup/popup.html"
+  },
+  "permissions": ["storage", "tabs"],
+  "host_permissions": [
+    "*://chat.openai.com/*",
+    "*://chatgpt.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "*://chat.openai.com/*",
+        "*://chatgpt.com/*"
+      ],
+      "js": ["dist/page-inject.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "*://chat.openai.com/*",
+        "*://chatgpt.com/*"
+      ],
+      "js": ["dist/content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "scripts": ["dist/background.js"]
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["dist/page-script.js", ".dev"],
+      "matches": ["*://chat.openai.com/*", "*://chatgpt.com/*"]
+    }
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "lightsession@example.com",
+      "strict_min_version": "115.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
+  }
+}

@@ -9,7 +9,7 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "types": ["firefox-webext-browser"],
+    "types": ["firefox-webext-browser", "chrome"],
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,

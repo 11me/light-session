@@ -3,6 +3,31 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { DEFAULT_SETTINGS, VALIDATION } from '../../extension/src/shared/constants';
+
+// Create mock functions for browser storage
+const mockStorageGet = vi.fn();
+const mockStorageSet = vi.fn();
+
+// Mock browser-polyfill BEFORE importing storage
+vi.mock('../../extension/src/shared/browser-polyfill', () => ({
+  default: {
+    storage: {
+      local: {
+        get: (...args: unknown[]) => mockStorageGet(...args),
+        set: (...args: unknown[]) => mockStorageSet(...args),
+      },
+    },
+  },
+}));
+
+// Mock logger to avoid console output in tests
+vi.mock('../../extension/src/shared/logger', () => ({
+  logDebug: vi.fn(),
+  logError: vi.fn(),
+}));
+
+// Import storage functions AFTER mocks are set up
 import {
   validateSettings,
   loadSettings,
@@ -10,13 +35,6 @@ import {
   initializeSettings,
   STORAGE_KEY,
 } from '../../extension/src/shared/storage';
-import { DEFAULT_SETTINGS, VALIDATION } from '../../extension/src/shared/constants';
-
-// Mock logger to avoid console output in tests
-vi.mock('../../extension/src/shared/logger', () => ({
-  logDebug: vi.fn(),
-  logError: vi.fn(),
-}));
 
 describe('validateSettings', () => {
   it('returns default settings when given empty object', () => {
@@ -97,10 +115,6 @@ describe('loadSettings', () => {
     vi.resetAllMocks();
   });
 
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
   it('returns stored settings when they exist', async () => {
     const storedSettings = {
       enabled: false,
@@ -109,14 +123,7 @@ describe('loadSettings', () => {
       debug: true,
     };
 
-    // Mock browser.storage.local.get
-    vi.stubGlobal('browser', {
-      storage: {
-        local: {
-          get: vi.fn().mockResolvedValue({ [STORAGE_KEY]: storedSettings }),
-        },
-      },
-    });
+    mockStorageGet.mockResolvedValue({ [STORAGE_KEY]: storedSettings });
 
     const result = await loadSettings();
 
@@ -128,13 +135,7 @@ describe('loadSettings', () => {
   });
 
   it('returns default settings when storage is empty', async () => {
-    vi.stubGlobal('browser', {
-      storage: {
-        local: {
-          get: vi.fn().mockResolvedValue({}),
-        },
-      },
-    });
+    mockStorageGet.mockResolvedValue({});
 
     const result = await loadSettings();
 
@@ -142,13 +143,7 @@ describe('loadSettings', () => {
   });
 
   it('returns default settings when storage.get throws', async () => {
-    vi.stubGlobal('browser', {
-      storage: {
-        local: {
-          get: vi.fn().mockRejectedValue(new Error('Storage unavailable')),
-        },
-      },
-    });
+    mockStorageGet.mockRejectedValue(new Error('Storage unavailable'));
 
     const result = await loadSettings();
 
@@ -158,13 +153,7 @@ describe('loadSettings', () => {
 
   it('validates and clamps invalid stored values', async () => {
     // Store out-of-range keep value
-    vi.stubGlobal('browser', {
-      storage: {
-        local: {
-          get: vi.fn().mockResolvedValue({ [STORAGE_KEY]: { keep: 9999 } }),
-        },
-      },
-    });
+    mockStorageGet.mockResolvedValue({ [STORAGE_KEY]: { keep: 9999 } });
 
     const result = await loadSettings();
 
@@ -177,10 +166,6 @@ describe('updateSettings', () => {
     vi.resetAllMocks();
   });
 
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
   it('merges partial updates with existing settings', async () => {
     const existingSettings = {
       enabled: true,
@@ -190,21 +175,13 @@ describe('updateSettings', () => {
       version: 1,
     };
 
-    const mockSet = vi.fn().mockResolvedValue(undefined);
-
-    vi.stubGlobal('browser', {
-      storage: {
-        local: {
-          get: vi.fn().mockResolvedValue({ [STORAGE_KEY]: existingSettings }),
-          set: mockSet,
-        },
-      },
-    });
+    mockStorageGet.mockResolvedValue({ [STORAGE_KEY]: existingSettings });
+    mockStorageSet.mockResolvedValue(undefined);
 
     await updateSettings({ keep: 30 });
 
     // Verify set was called with merged settings
-    expect(mockSet).toHaveBeenCalledWith({
+    expect(mockStorageSet).toHaveBeenCalledWith({
       [STORAGE_KEY]: expect.objectContaining({
         enabled: true, // preserved
         keep: 30, // updated
@@ -215,20 +192,12 @@ describe('updateSettings', () => {
   });
 
   it('validates updated values', async () => {
-    const mockSet = vi.fn().mockResolvedValue(undefined);
-
-    vi.stubGlobal('browser', {
-      storage: {
-        local: {
-          get: vi.fn().mockResolvedValue({}),
-          set: mockSet,
-        },
-      },
-    });
+    mockStorageGet.mockResolvedValue({});
+    mockStorageSet.mockResolvedValue(undefined);
 
     await updateSettings({ keep: -100 }); // Invalid, should be clamped
 
-    expect(mockSet).toHaveBeenCalledWith({
+    expect(mockStorageSet).toHaveBeenCalledWith({
       [STORAGE_KEY]: expect.objectContaining({
         keep: VALIDATION.MIN_KEEP, // Clamped
       }),
@@ -236,27 +205,15 @@ describe('updateSettings', () => {
   });
 
   it('throws error when storage.set fails', async () => {
-    vi.stubGlobal('browser', {
-      storage: {
-        local: {
-          get: vi.fn().mockResolvedValue({}),
-          set: vi.fn().mockRejectedValue(new Error('Write failed')),
-        },
-      },
-    });
+    mockStorageGet.mockResolvedValue({});
+    mockStorageSet.mockRejectedValue(new Error('Write failed'));
 
     await expect(updateSettings({ enabled: false })).rejects.toThrow('Write failed');
   });
 
   it('handles error in loadSettings during update', async () => {
-    vi.stubGlobal('browser', {
-      storage: {
-        local: {
-          get: vi.fn().mockRejectedValue(new Error('Read failed')),
-          set: vi.fn().mockResolvedValue(undefined),
-        },
-      },
-    });
+    mockStorageGet.mockRejectedValue(new Error('Read failed'));
+    mockStorageSet.mockResolvedValue(undefined);
 
     // Should still work - loadSettings returns defaults on error
     await expect(updateSettings({ enabled: false })).resolves.toBeUndefined();
@@ -268,69 +225,36 @@ describe('initializeSettings', () => {
     vi.resetAllMocks();
   });
 
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
   it('sets default settings when storage is empty', async () => {
-    const mockSet = vi.fn().mockResolvedValue(undefined);
-
-    vi.stubGlobal('browser', {
-      storage: {
-        local: {
-          get: vi.fn().mockResolvedValue({}),
-          set: mockSet,
-        },
-      },
-    });
+    mockStorageGet.mockResolvedValue({});
+    mockStorageSet.mockResolvedValue(undefined);
 
     await initializeSettings();
 
-    expect(mockSet).toHaveBeenCalledWith({
+    expect(mockStorageSet).toHaveBeenCalledWith({
       [STORAGE_KEY]: DEFAULT_SETTINGS,
     });
   });
 
   it('does not overwrite existing settings', async () => {
     const existingSettings = { enabled: false, keep: 50 };
-    const mockSet = vi.fn();
-
-    vi.stubGlobal('browser', {
-      storage: {
-        local: {
-          get: vi.fn().mockResolvedValue({ [STORAGE_KEY]: existingSettings }),
-          set: mockSet,
-        },
-      },
-    });
+    mockStorageGet.mockResolvedValue({ [STORAGE_KEY]: existingSettings });
 
     await initializeSettings();
 
-    expect(mockSet).not.toHaveBeenCalled();
+    expect(mockStorageSet).not.toHaveBeenCalled();
   });
 
   it('does not throw when storage.get fails', async () => {
-    vi.stubGlobal('browser', {
-      storage: {
-        local: {
-          get: vi.fn().mockRejectedValue(new Error('Storage error')),
-        },
-      },
-    });
+    mockStorageGet.mockRejectedValue(new Error('Storage error'));
 
     // Should not throw
     await expect(initializeSettings()).resolves.toBeUndefined();
   });
 
   it('does not throw when storage.set fails', async () => {
-    vi.stubGlobal('browser', {
-      storage: {
-        local: {
-          get: vi.fn().mockResolvedValue({}),
-          set: vi.fn().mockRejectedValue(new Error('Write error')),
-        },
-      },
-    });
+    mockStorageGet.mockResolvedValue({});
+    mockStorageSet.mockRejectedValue(new Error('Write error'));
 
     // Should not throw (error is logged but swallowed)
     await expect(initializeSettings()).resolves.toBeUndefined();

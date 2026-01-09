@@ -233,6 +233,126 @@ describe('fetch interception with trimMapping', () => {
 // Config Tests
 // ============================================================================
 
+describe('config JSON parsing (cross-browser compatibility)', () => {
+  interface LsConfig {
+    enabled: boolean;
+    limit: number;
+    debug: boolean;
+  }
+
+  const DEFAULT_CONFIG: LsConfig = {
+    enabled: true,
+    limit: 10,
+    debug: false,
+  };
+
+  /**
+   * Parse config from CustomEvent detail.
+   * Mirrors the logic in page-script.ts setupConfigListener()
+   */
+  function parseConfigFromDetail(detail: unknown): LsConfig | null {
+    let config: LsConfig | null = null;
+
+    if (typeof detail === 'string') {
+      try {
+        config = JSON.parse(detail) as LsConfig;
+      } catch {
+        return null;
+      }
+    } else if (detail && typeof detail === 'object') {
+      config = detail as LsConfig;
+    }
+
+    if (config && typeof config === 'object') {
+      return {
+        enabled: config.enabled ?? DEFAULT_CONFIG.enabled,
+        limit: Math.max(1, config.limit ?? DEFAULT_CONFIG.limit),
+        debug: config.debug ?? DEFAULT_CONFIG.debug,
+      };
+    }
+
+    return null;
+  }
+
+  it('parses JSON string correctly (Chrome compatibility)', () => {
+    const configObj = { enabled: false, limit: 3, debug: true };
+    const jsonString = JSON.stringify(configObj);
+
+    const result = parseConfigFromDetail(jsonString);
+
+    expect(result).not.toBeNull();
+    expect(result?.enabled).toBe(false);
+    expect(result?.limit).toBe(3);
+    expect(result?.debug).toBe(true);
+  });
+
+  it('handles object directly (backwards compatibility)', () => {
+    const configObj = { enabled: true, limit: 5, debug: false };
+
+    const result = parseConfigFromDetail(configObj);
+
+    expect(result).not.toBeNull();
+    expect(result?.enabled).toBe(true);
+    expect(result?.limit).toBe(5);
+    expect(result?.debug).toBe(false);
+  });
+
+  it('returns null for invalid JSON string', () => {
+    const invalidJson = 'not valid json {{{';
+
+    const result = parseConfigFromDetail(invalidJson);
+
+    expect(result).toBeNull();
+  });
+
+  it('returns null for empty string', () => {
+    const result = parseConfigFromDetail('');
+
+    expect(result).toBeNull();
+  });
+
+  it('returns null for null detail', () => {
+    const result = parseConfigFromDetail(null);
+
+    expect(result).toBeNull();
+  });
+
+  it('returns null for undefined detail', () => {
+    const result = parseConfigFromDetail(undefined);
+
+    expect(result).toBeNull();
+  });
+
+  it('applies defaults for missing fields in JSON', () => {
+    const partialConfig = { limit: 7 }; // missing enabled and debug
+    const jsonString = JSON.stringify(partialConfig);
+
+    const result = parseConfigFromDetail(jsonString);
+
+    expect(result?.enabled).toBe(true); // default
+    expect(result?.limit).toBe(7);
+    expect(result?.debug).toBe(false); // default
+  });
+
+  it('enforces minimum limit of 1 from JSON', () => {
+    const configWithZeroLimit = { enabled: true, limit: 0, debug: false };
+    const jsonString = JSON.stringify(configWithZeroLimit);
+
+    const result = parseConfigFromDetail(jsonString);
+
+    expect(result?.limit).toBe(1);
+  });
+
+  it('enforces minimum limit of 1 from negative value', () => {
+    const configWithNegativeLimit = { enabled: true, limit: -5, debug: false };
+    const jsonString = JSON.stringify(configWithNegativeLimit);
+
+    const result = parseConfigFromDetail(jsonString);
+
+    expect(result?.limit).toBe(1);
+  });
+});
+
 describe('config handling', () => {
   it('uses default values when config is undefined', () => {
     const DEFAULT_CONFIG = {

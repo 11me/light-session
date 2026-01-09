@@ -1,8 +1,9 @@
 /**
- * LightSession for ChatGPT - Popup UI Logic
+ * LightSession Pro - Popup UI Logic
  * Settings interface and interaction handlers
  */
 
+import browser from '../shared/browser-polyfill';
 import type { LsSettings } from '../shared/types';
 import { sendMessageWithTimeout } from '../shared/messages';
 import { SUPPORT_URL } from '../shared/constants';
@@ -123,6 +124,32 @@ async function isDevMode(): Promise<boolean> {
 }
 
 /**
+ * Reload the active ChatGPT tab to apply settings changes.
+ * Settings like message limit require a page reload to take effect
+ * because the fetch proxy caches settings at intercept time.
+ */
+async function reloadActiveChatGPTTab(): Promise<void> {
+  try {
+    // Query for active tab in current window
+    const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+    const activeTab = tabs[0];
+
+    if (activeTab?.id && activeTab.url) {
+      // Only reload if it's a ChatGPT page
+      const isChatGPT =
+        activeTab.url.includes('chat.openai.com') ||
+        activeTab.url.includes('chatgpt.com');
+
+      if (isChatGPT) {
+        await browser.tabs.reload(activeTab.id);
+      }
+    }
+  } catch (error) {
+    console.error('Failed to reload tab:', error);
+  }
+}
+
+/**
  * Initialize popup UI
  */
 async function initialize(): Promise<void> {
@@ -158,9 +185,10 @@ async function initialize(): Promise<void> {
   await loadSettings();
 
   // Setup event listeners
-  enableToggle.addEventListener('change', handleEnableToggle);
+  // Wrap async handlers to satisfy ESLint no-misused-promises rule
+  enableToggle.addEventListener('change', () => void handleEnableToggle());
   keepSlider.addEventListener('input', handleKeepSliderInput);
-  keepSlider.addEventListener('change', handleKeepSliderChange);
+  keepSlider.addEventListener('change', () => void handleKeepSliderChange());
 
   // Slider visual feedback
   keepSlider.addEventListener('mousedown', () => {
@@ -237,10 +265,12 @@ async function updateSettings(
 /**
  * Handle enable/disable toggle
  */
-function handleEnableToggle(): void {
+async function handleEnableToggle(): Promise<void> {
   const enabled = enableToggle.checked;
-  void updateSettings({ enabled });
+  await updateSettings({ enabled });
   updateDisabledState(enabled);
+  // Reload page to apply the change
+  await reloadActiveChatGPTTab();
 }
 
 /**
@@ -255,11 +285,21 @@ function handleKeepSliderInput(): void {
 }
 
 /**
- * Handle keep slider change (debounced save)
+ * Handle keep slider change (final value when user releases slider)
  */
-function handleKeepSliderChange(): void {
+async function handleKeepSliderChange(): Promise<void> {
   const value = parseInt(keepSlider.value, 10);
-  scheduleKeepUpdate(value, true);
+
+  // Clear any pending debounced updates
+  if (sliderDebounceTimeout !== null) {
+    clearTimeout(sliderDebounceTimeout);
+    sliderDebounceTimeout = null;
+  }
+  pendingKeepValue = null;
+
+  // Save immediately and reload page
+  await updateSettings({ keep: value });
+  await reloadActiveChatGPTTab();
 }
 
 /**
