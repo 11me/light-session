@@ -11,6 +11,13 @@ import { logDebug, logError } from './logger';
 export const STORAGE_KEY = 'ls_settings';
 
 /**
+ * localStorage key for page-script access.
+ * Page scripts can't access browser.storage, so we mirror settings here
+ * to avoid race conditions on page load.
+ */
+export const LOCAL_STORAGE_KEY = 'ls_config';
+
+/**
  * Validate and normalize settings object
  * Ensures all fields are present and values are in valid ranges
  */
@@ -27,6 +34,27 @@ export function validateSettings(input: Partial<LsSettings>): LsSettings {
     ultraLean: input.ultraLean ?? DEFAULT_SETTINGS.ultraLean,
   };
 }
+/**
+ * Sync settings to localStorage for page-script access.
+ * Page scripts run in page context and can't access browser.storage,
+ * so we mirror the config they need (enabled, limit, debug) to localStorage.
+ * This eliminates race conditions on page load.
+ */
+export function syncToLocalStorage(settings: LsSettings): void {
+  try {
+    const config = {
+      enabled: settings.enabled,
+      limit: settings.keep,
+      debug: settings.debug,
+    };
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(config));
+    logDebug('Synced settings to localStorage:', config);
+  } catch (error) {
+    // localStorage might be unavailable (private browsing, etc.)
+    logError('Failed to sync to localStorage:', error);
+  }
+}
+
 
 /**
  * Load settings from browser.storage.local
@@ -39,15 +67,21 @@ export async function loadSettings(): Promise<LsSettings> {
 
     if (stored) {
       logDebug('Loaded settings from storage:', stored);
-      return validateSettings(stored);
+      const validated = validateSettings(stored);
+      syncToLocalStorage(validated);
+      return validated;
     }
 
     // No stored settings, return defaults
     logDebug('No stored settings found, using defaults');
-    return validateSettings({});
+    const defaults = validateSettings({});
+    syncToLocalStorage(defaults);
+    return defaults;
   } catch (error) {
     logError('Failed to load settings:', error);
-    return validateSettings({});
+    const defaults = validateSettings({});
+    syncToLocalStorage(defaults);
+    return defaults;
   }
 }
 
@@ -65,6 +99,7 @@ export async function updateSettings(updates: Partial<Omit<LsSettings, 'version'
 
     // Save to storage
     await browser.storage.local.set({ [STORAGE_KEY]: merged });
+    syncToLocalStorage(merged);
 
     logDebug('Updated settings:', merged);
   } catch (error) {
@@ -83,6 +118,7 @@ export async function initializeSettings(): Promise<void> {
 
     if (!result[STORAGE_KEY]) {
       await browser.storage.local.set({ [STORAGE_KEY]: DEFAULT_SETTINGS });
+      syncToLocalStorage(DEFAULT_SETTINGS);
       logDebug('Initialized default settings');
     }
   } catch (error) {
