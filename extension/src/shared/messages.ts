@@ -18,12 +18,56 @@ export async function sendMessageWithTimeout<T extends RuntimeResponse>(
   message: RuntimeMessage,
   timeoutMs: number = TIMING.MESSAGE_TIMEOUT_MS
 ): Promise<T> {
-  return Promise.race([
-    browser.runtime.sendMessage(message) as Promise<T>,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error('Message timeout')), timeoutMs)
-    ),
-  ]);
+  const isChrome = typeof chrome !== 'undefined' && typeof browser === 'undefined';
+  const retryDelays = TIMING.MESSAGE_RETRY_DELAYS_MS;
+  let lastError: Error | undefined;
+
+  // Attempt with retries for Chrome service worker wake-up
+  for (let attempt = 0; attempt <= retryDelays.length; attempt++) {
+    try {
+      const response = await Promise.race([
+        browser.runtime.sendMessage(message) as Promise<T | undefined>,
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Message timeout')), timeoutMs)
+        ),
+      ]);
+
+      // Check Chrome lastError (set when no listener exists)
+      if (isChrome && chrome.runtime.lastError) {
+        throw new Error(chrome.runtime.lastError.message ?? 'Chrome runtime error');
+      }
+
+      // Validate response is not undefined (Chrome returns undefined if service worker inactive)
+      if (response === undefined) {
+        if (attempt < retryDelays.length) {
+          // Wait before retry with exponential backoff
+          await new Promise((resolve) => setTimeout(resolve, retryDelays[attempt]));
+          continue;
+        }
+        throw new Error('Service worker not responding - received undefined after retries');
+      }
+
+      return response;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      // Don't retry on timeout - it's already waited long enough
+      if (lastError.message === 'Message timeout') {
+        throw lastError;
+      }
+
+      // Retry if we haven't exhausted attempts
+      if (attempt < retryDelays.length) {
+        await new Promise((resolve) => setTimeout(resolve, retryDelays[attempt]));
+        continue;
+      }
+
+      throw lastError;
+    }
+  }
+
+  // Should never reach here, but TypeScript needs it
+  throw lastError ?? new Error('Message failed after retries');
 }
 
 /**

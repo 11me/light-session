@@ -90,6 +90,17 @@ export const TIMING = {
   MESSAGE_TIMEOUT_MS: 500,
 
   /**
+   * Retry delays for Chrome service worker wake-up (ms).
+   *
+   * Rationale:
+   * - Chrome MV3 service workers can be inactive when popup opens
+   * - sendMessage returns undefined if no listener registered yet
+   * - Exponential backoff: 50ms, 100ms, 200ms allows progressive wake-up
+   * - Total max wait: 350ms, within user tolerance for popup load
+   */
+  MESSAGE_RETRY_DELAYS_MS: [50, 100, 200] as const,
+
+  /**
    * Timeout for fetch proxy ready signal (ms).
    *
    * Rationale:

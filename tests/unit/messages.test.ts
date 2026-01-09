@@ -83,6 +83,80 @@ describe('sendMessageWithTimeout', () => {
   });
 });
 
+describe('sendMessageWithTimeout retry logic', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.useRealTimers();
+  });
+
+  it('retries on undefined response and succeeds after retry', async () => {
+    const expectedResponse = { settings: { enabled: true, keep: 10 } };
+    // First call returns undefined, second succeeds
+    mockSendMessage
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(expectedResponse);
+
+    const response = await sendMessageWithTimeout({ type: 'GET_SETTINGS' });
+
+    expect(response).toEqual(expectedResponse);
+    expect(mockSendMessage).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries multiple times on undefined responses', async () => {
+    const expectedResponse = { settings: { enabled: true, keep: 10 } };
+    // First two calls return undefined, third succeeds
+    mockSendMessage
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(expectedResponse);
+
+    const response = await sendMessageWithTimeout({ type: 'GET_SETTINGS' });
+
+    expect(response).toEqual(expectedResponse);
+    expect(mockSendMessage).toHaveBeenCalledTimes(3);
+  });
+
+  it('throws after max retries exceeded on persistent undefined', async () => {
+    // All calls return undefined
+    mockSendMessage.mockResolvedValue(undefined);
+
+    await expect(
+      sendMessageWithTimeout({ type: 'GET_SETTINGS' })
+    ).rejects.toThrow('Service worker not responding - received undefined after retries');
+
+    // Initial attempt + 3 retries = 4 calls
+    expect(mockSendMessage).toHaveBeenCalledTimes(4);
+  });
+
+  it('does not retry on timeout error', async () => {
+    vi.useFakeTimers();
+    // Never resolve - will timeout
+    mockSendMessage.mockImplementation(() => new Promise(() => {}));
+
+    const responsePromise = sendMessageWithTimeout({ type: 'GET_SETTINGS' }, 100);
+
+    // Fast-forward past timeout
+    vi.advanceTimersByTime(150);
+
+    await expect(responsePromise).rejects.toThrow('Message timeout');
+    // Should only try once - timeout doesn't trigger retry
+    expect(mockSendMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries on error and succeeds after retry', async () => {
+    const expectedResponse = { settings: { enabled: true, keep: 10 } };
+    // First call throws error, second succeeds
+    mockSendMessage
+      .mockRejectedValueOnce(new Error('Connection failed'))
+      .mockResolvedValueOnce(expectedResponse);
+
+    const response = await sendMessageWithTimeout({ type: 'GET_SETTINGS' });
+
+    expect(response).toEqual(expectedResponse);
+    expect(mockSendMessage).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe('createMessageHandler', () => {
   beforeEach(() => {
     vi.resetAllMocks();
