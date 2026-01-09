@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "LightSession Pro",
+  "name": "LightSession Pro for ChatGPT",
   "version": "1.6.1",
   "description": "Keep ChatGPT fast by keeping only the last N messages in the DOM. Local-only.",
   "icons": {
