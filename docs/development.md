@@ -277,3 +277,65 @@ The extension uses a tiered selector approach:
 - Check `showStatusBar` setting is enabled
 - Verify content script is running (check console)
 - Inspect DOM for `#lightsession-status-bar` element
+
+## Release Process
+
+Releases are automated via GitHub Actions when a tag is pushed:
+
+```bash
+# Create and push a release tag
+git tag v1.2.3
+git push origin v1.2.3
+```
+
+The workflow builds both Firefox and Chrome versions, creates a GitHub Release,
+and publishes to both browser stores.
+
+### Required GitHub Secrets
+
+The following secrets must be configured in the repository settings:
+
+#### Firefox Add-ons
+
+| Secret | Description |
+|--------|-------------|
+| `FIREFOX_ADDON_ID` | AMO extension ID (e.g., `lightsession@example.com`) |
+| `FIREFOX_API_ISSUER` | JWT issuer from AMO API credentials |
+| `FIREFOX_API_SECRET` | JWT secret from AMO API credentials |
+
+#### Chrome Web Store
+
+| Secret | Description |
+|--------|-------------|
+| `CHROME_EXTENSION_ID` | Chrome extension ID (32-char alphanumeric) |
+| `CHROME_CLIENT_ID` | OAuth 2.0 client ID from Google Cloud Console |
+| `CHROME_CLIENT_SECRET` | OAuth 2.0 client secret |
+| `CHROME_REFRESH_TOKEN` | OAuth 2.0 refresh token for Chrome Web Store API |
+
+### Getting Chrome Web Store Credentials
+
+1. **Create a Google Cloud Project** at [console.cloud.google.com](https://console.cloud.google.com)
+2. **Enable the Chrome Web Store API** in the API Library
+3. **Create OAuth 2.0 credentials** (Desktop application type)
+4. **Get a refresh token** using the OAuth 2.0 flow:
+   - Use the client ID/secret to authorize
+   - Request scope: `https://www.googleapis.com/auth/chromewebstore`
+   - Exchange the authorization code for a refresh token
+
+For detailed instructions, see the [Chrome Web Store API documentation](https://developer.chrome.com/docs/webstore/using_webstore_api/).
+
+### Multi-Browser Build
+
+```bash
+# Build for Firefox
+npm run build:prod:firefox
+
+# Build for Chrome
+npm run build:prod:chrome
+
+# Build both (development)
+npm run build:firefox && npm run build:chrome
+```
+
+The build system automatically switches between `manifest.firefox.json` and
+`manifest.chrome.json` based on the target.

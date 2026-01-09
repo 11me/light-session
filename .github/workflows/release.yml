@@ -34,23 +34,45 @@ jobs:
       - name: Type check
         run: npm run build:types
 
-      - name: Build
-        run: npm run build
-
       - name: Get version from tag
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
-      - name: Create extension zip
+      # =========================================================================
+      # Firefox Build
+      # =========================================================================
+      - name: Build Firefox extension
+        run: npm run build:prod:firefox
+
+      - name: Create Firefox extension zip
         run: |
           cd extension
-          zip -r ../light-session-${{ steps.version.outputs.VERSION }}.zip \
+          zip -r ../light-session-${{ steps.version.outputs.VERSION }}-firefox.zip \
             manifest.json \
             dist/ \
             popup/ \
             icons/ \
             -x "*.map"
 
+      # =========================================================================
+      # Chrome Build
+      # =========================================================================
+      - name: Build Chrome extension
+        run: npm run build:prod:chrome
+
+      - name: Create Chrome extension zip
+        run: |
+          cd extension
+          zip -r ../light-session-${{ steps.version.outputs.VERSION }}-chrome.zip \
+            manifest.json \
+            dist/ \
+            popup/ \
+            icons/ \
+            -x "*.map"
+
+      # =========================================================================
+      # Source Archive
+      # =========================================================================
       - name: Create source zip
         run: |
           zip -r light-session-${{ steps.version.outputs.VERSION }}-source.zip \
@@ -68,15 +90,20 @@ jobs:
             docs/ \
             extension/src/ \
             extension/icons/ \
-            extension/manifest.json \
+            extension/manifest.firefox.json \
+            extension/manifest.chrome.json \
             tests/
 
+      # =========================================================================
+      # GitHub Release
+      # =========================================================================
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
           files: |
-            light-session-${{ steps.version.outputs.VERSION }}.zip
+            light-session-${{ steps.version.outputs.VERSION }}-firefox.zip
+            light-session-${{ steps.version.outputs.VERSION }}-chrome.zip
             light-session-${{ steps.version.outputs.VERSION }}-source.zip
           body: |
             ## LightSession v${{ steps.version.outputs.VERSION }}
@@ -86,19 +113,43 @@ jobs:
             **Firefox Add-ons (recommended):**
             [Install from AMO](https://addons.mozilla.org/en-US/firefox/addon/lightsession-for-chatgpt/)
 
-            **Manual install:**
-            1. Download `light-session-${{ steps.version.outputs.VERSION }}.zip`
+            **Chrome Web Store:**
+            [Install from Chrome Web Store](https://chrome.google.com/webstore/detail/lightsession-for-chatgpt/${{ secrets.CHROME_EXTENSION_ID }})
+
+            **Manual install (Firefox):**
+            1. Download `light-session-${{ steps.version.outputs.VERSION }}-firefox.zip`
             2. Open `about:debugging#/runtime/this-firefox` in Firefox
             3. Click "Load Temporary Add-on"
             4. Select the downloaded zip file
 
+            **Manual install (Chrome):**
+            1. Download `light-session-${{ steps.version.outputs.VERSION }}-chrome.zip`
+            2. Open `chrome://extensions` in Chrome
+            3. Enable "Developer mode"
+            4. Click "Load unpacked" and select the extracted folder
+
             ---
 
+      # =========================================================================
+      # Firefox Add-ons Publishing
+      # =========================================================================
       - name: Publish to Firefox Add-ons
         uses: browser-actions/release-firefox-addon@latest
         with:
           addon-id: ${{ secrets.FIREFOX_ADDON_ID }}
-          addon-path: light-session-${{ steps.version.outputs.VERSION }}.zip
+          addon-path: light-session-${{ steps.version.outputs.VERSION }}-firefox.zip
           auth-api-issuer: ${{ secrets.FIREFOX_API_ISSUER }}
           auth-api-secret: ${{ secrets.FIREFOX_API_SECRET }}
           release-note: "See release notes at https://github.com/11me/light-session/releases/tag/v${{ steps.version.outputs.VERSION }}"
+
+      # =========================================================================
+      # Chrome Web Store Publishing
+      # =========================================================================
+      - name: Publish to Chrome Web Store
+        uses: browser-actions/release-chrome-extension@latest
+        with:
+          extension-id: ${{ secrets.CHROME_EXTENSION_ID }}
+          extension-path: light-session-${{ steps.version.outputs.VERSION }}-chrome.zip
+          oauth-client-id: ${{ secrets.CHROME_CLIENT_ID }}
+          oauth-client-secret: ${{ secrets.CHROME_CLIENT_SECRET }}
+          oauth-refresh-token: ${{ secrets.CHROME_REFRESH_TOKEN }}
