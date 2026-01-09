@@ -33,11 +33,8 @@ export async function sendMessageWithTimeout<T extends RuntimeResponse>(
       ]);
 
       // Check Chrome lastError (set when no listener exists)
-      if (isChrome) {
-        const chromeLastError = (chrome as { runtime: { lastError?: { message?: string } } }).runtime.lastError;
-        if (chromeLastError) {
-          throw new Error(chromeLastError.message ?? 'Chrome runtime error');
-        }
+      if (isChrome && chrome.runtime.lastError) {
+        throw new Error(chrome.runtime.lastError.message ?? 'Chrome runtime error');
       }
 
       // Validate response is not undefined (Chrome returns undefined if service worker inactive)
