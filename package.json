@@ -2,15 +2,20 @@
   "name": "light-session",
   "version": "1.6.1",
   "type": "module",
-  "description": "LightSession for ChatGPT - Firefox extension to optimize long conversation performance",
+  "description": "LightSession Pro - Browser extension to optimize ChatGPT performance",
   "engines": {
     "node": ">=24.10.0"
   },
   "scripts": {
     "build": "node build.cjs",
+    "build:firefox": "node build.cjs --target=firefox",
+    "build:chrome": "node build.cjs --target=chrome",
     "build:types": "tsc --noEmit",
     "build:prod": "rm -f extension/.dev && NODE_ENV=production node build.cjs",
+    "build:prod:firefox": "rm -f extension/.dev && NODE_ENV=production node build.cjs --target=firefox",
+    "build:prod:chrome": "rm -f extension/.dev && NODE_ENV=production node build.cjs --target=chrome",
     "watch": "node build.cjs --watch",
+    "watch:chrome": "node build.cjs --target=chrome --watch",
     "lint": "eslint extension/src",
     "lint:fix": "eslint extension/src --fix",
     "format": "prettier --write 'extension/src/**/*.ts'",
@@ -18,9 +23,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "dev": "npm run build && web-ext run --source-dir=extension --firefox=firefoxdeveloperedition --start-url='https://chat.openai.com'",
-    "dev:stable": "npm run build && web-ext run --source-dir=extension --firefox=firefox --start-url='https://chat.openai.com'",
-    "package": "npm run build:prod && web-ext build --source-dir=extension --artifacts-dir=web-ext-artifacts",
+    "dev": "npm run build:firefox && web-ext run --source-dir=extension --firefox=firefoxdeveloperedition --start-url='https://chat.openai.com'",
+    "dev:stable": "npm run build:firefox && web-ext run --source-dir=extension --firefox=firefox --start-url='https://chat.openai.com'",
+    "package": "npm run build:prod:firefox && web-ext build --source-dir=extension --artifacts-dir=web-ext-artifacts",
+    "package:chrome": "npm run build:prod:chrome && cd extension && zip -r ../web-ext-artifacts/lightsession-chrome.zip . -x '*.ts' -x 'src/*' -x 'manifest.*.json'",
     "clean": "rm -rf extension/dist extension/popup/popup.js web-ext-artifacts"
   },
   "keywords": [
@@ -44,6 +50,7 @@
   "license": "MIT",
   "devDependencies": {
     "@eslint/js": "^9.39.2",
+    "@types/chrome": "^0.1.32",
     "@types/firefox-webext-browser": "^143.0.0",
     "esbuild": "^0.27.2",
     "eslint": "^9.39.2",

@@ -282,11 +282,28 @@ function patchFetch(): void {
 }
 
 /**
- * Listen for config updates from content script
+ * Listen for config updates from content script.
+ * Config is received as JSON string for cross-browser compatibility.
  */
 function setupConfigListener(): void {
-  window.addEventListener('lightsession-config', ((event: CustomEvent<LsConfig>) => {
-    const config = event.detail;
+  window.addEventListener('lightsession-config', ((event: CustomEvent<string>) => {
+    const detail = event.detail;
+
+    // Parse JSON string (content script serializes config for Chrome compatibility)
+    let config: LsConfig | null = null;
+
+    if (typeof detail === 'string') {
+      try {
+        config = JSON.parse(detail) as LsConfig;
+      } catch {
+        // Invalid JSON, ignore
+        return;
+      }
+    } else if (detail && typeof detail === 'object') {
+      // Fallback: handle object directly (backwards compatibility)
+      config = detail as unknown as LsConfig;
+    }
+
     if (config && typeof config === 'object') {
       // Update debug flag first so logging works immediately
       window.__LS_DEBUG__ = config.debug ?? false;

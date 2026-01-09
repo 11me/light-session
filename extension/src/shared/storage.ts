@@ -1,8 +1,9 @@
 /**
- * LightSession for ChatGPT - Storage Utility
+ * LightSession Pro - Storage Utility
  * Settings persistence and validation
  */
 
+import browser from './browser-polyfill';
 import type { LsSettings } from './types';
 import { DEFAULT_SETTINGS, VALIDATION } from './constants';
 import { logDebug, logError } from './logger';

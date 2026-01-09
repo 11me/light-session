@@ -1,9 +1,9 @@
 /**
- * LightSession for ChatGPT - Background Script
+ * LightSession Pro - Background Script
  * Manages settings and routes messages between content and popup scripts
  */
 
-import '../shared/browser-polyfill';
+import browser from '../shared/browser-polyfill';
 import type { RuntimeMessage, RuntimeResponse } from '../shared/types';
 import { initializeSettings, loadSettings, updateSettings } from '../shared/storage';
 import { setDebugMode, logDebug, logError } from '../shared/logger';
@@ -73,9 +73,8 @@ browser.storage.onChanged.addListener((changes, areaName) => {
 });
 
 // Register message listener
-// Cast needed to work around Firefox WebExtensions type mismatch
-// eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
-browser.runtime.onMessage.addListener(messageHandler as any);
+// The handler returns true to indicate async response (required for Chrome)
+browser.runtime.onMessage.addListener(messageHandler);
 
 // Initialize on script load
 initialize().catch((error) => {

@@ -20,16 +20,6 @@ import {
   setStatusBarVisibility,
 } from './status-bar';
 
-// ============================================================================
-// Firefox-specific Global Declarations
-// ============================================================================
-
-/**
- * Firefox's cloneInto() function for Xray vision workaround.
- * Clones objects from content script context into page context.
- * @see https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Sharing_objects_with_page_scripts
- */
-declare function cloneInto<T>(obj: T, targetScope: Window): T;
 
 // ============================================================================
 // Types for Page Script Communication
@@ -71,10 +61,14 @@ let proxyReady = false;
  * Dispatch configuration to the page script via CustomEvent.
  * The page script listens for 'lightsession-config' events.
  *
- * In Firefox, content scripts run in an isolated sandbox. Objects created
- * in this sandbox are not accessible from page context due to Xray vision.
- * We use cloneInto() to clone the config object into the page context,
- * making it accessible to the page script.
+ * Cross-browser compatibility:
+ * - Firefox: Content scripts run in an isolated sandbox (Xray vision).
+ *   We use cloneInto() to clone objects into page context.
+ * - Chrome: Content scripts run in "isolated worlds". Objects passed via
+ *   CustomEvent.detail may not be accessible to page scripts reliably.
+ *
+ * Solution: Always serialize config to JSON string. This works in both browsers
+ * and avoids issues with object cloning across isolation boundaries.
  *
  * @see https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Sharing_objects_with_page_scripts
  */
@@ -85,12 +79,12 @@ function dispatchConfig(settings: LsSettings): void {
     debug: settings.debug,
   };
 
-  // Clone config into page context for Firefox (Xray vision workaround)
-  // cloneInto is a Firefox-specific API, check for availability
-  const detail =
-    typeof cloneInto === 'function' ? cloneInto(config, window) : config;
+  // Serialize to JSON string for cross-browser compatibility
+  // Chrome's isolated worlds don't reliably pass objects via CustomEvent.detail
+  // JSON string is safely passed as a primitive
+  const jsonString = JSON.stringify(config);
 
-  window.dispatchEvent(new CustomEvent('lightsession-config', { detail }));
+  window.dispatchEvent(new CustomEvent('lightsession-config', { detail: jsonString }));
 
   logDebug('Dispatched config to page script:', config);
 }
