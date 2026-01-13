@@ -4,7 +4,7 @@
  */
 
 import browser from './browser-polyfill';
-import type { RuntimeMessage, RuntimeResponse } from './types';
+import type { RuntimeMessage, RuntimeResponse, ErrorResponse } from './types';
 import { TIMING } from './constants';
 import { logError } from './logger';
 
@@ -18,7 +18,11 @@ export async function sendMessageWithTimeout<T extends RuntimeResponse>(
   message: RuntimeMessage,
   timeoutMs: number = TIMING.MESSAGE_TIMEOUT_MS
 ): Promise<T> {
-  const isChrome = typeof chrome !== 'undefined' && typeof browser === 'undefined';
+  // Detect Chrome vs Firefox using feature detection
+  // Firefox has browser.runtime.getBrowserInfo() which Chrome doesn't have
+  // This is more reliable than checking global objects which can be polyfilled
+  const isFirefox = typeof browser.runtime.getBrowserInfo === 'function';
+  const isChrome = !isFirefox && typeof chrome !== 'undefined' && !!chrome.runtime;
   const retryDelays = TIMING.MESSAGE_RETRY_DELAYS_MS;
   let lastError: Error | undefined;
 
@@ -33,11 +37,8 @@ export async function sendMessageWithTimeout<T extends RuntimeResponse>(
       ]);
 
       // Check Chrome lastError (set when no listener exists)
-      if (isChrome) {
-        const chromeLastError = (chrome as { runtime: { lastError?: { message?: string } } }).runtime.lastError;
-        if (chromeLastError) {
-          throw new Error(chromeLastError.message ?? 'Chrome runtime error');
-        }
+      if (isChrome && chrome.runtime.lastError) {
+        throw new Error(chrome.runtime.lastError.message ?? 'Chrome runtime error');
       }
 
       // Validate response is not undefined (Chrome returns undefined if service worker inactive)
@@ -50,12 +51,17 @@ export async function sendMessageWithTimeout<T extends RuntimeResponse>(
         throw new Error('Service worker not responding - received undefined after retries');
       }
 
+      // Check for error response from handler (don't retry real errors)
+      if ('error' in response && typeof response.error === 'string') {
+        throw new Error(`Handler error: ${response.error}`);
+      }
+
       return response;
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
 
-      // Don't retry on timeout - it's already waited long enough
-      if (lastError.message === 'Message timeout') {
+      // Don't retry on timeout or handler errors - these are real failures
+      if (lastError.message === 'Message timeout' || lastError.message.startsWith('Handler error:')) {
         throw lastError;
       }
 
@@ -115,8 +121,10 @@ export function createMessageHandler(
         sendResponse(response);
       } catch (error) {
         logError('Message handler error:', error);
-        // Send error response so caller doesn't hang
-        sendResponse({ error: String(error) } as unknown as RuntimeResponse);
+        // Send error response so caller doesn't hang waiting for response
+        // Caller must check for error field in response
+        const errorResponse: ErrorResponse = { error: String(error) };
+        sendResponse(errorResponse);
       }
     })();
 

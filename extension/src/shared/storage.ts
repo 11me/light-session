@@ -41,6 +41,12 @@ export function validateSettings(input: Partial<LsSettings>): LsSettings {
  * This eliminates race conditions on page load.
  */
 export function syncToLocalStorage(settings: LsSettings): void {
+  // Guard: localStorage unavailable in service worker (Chrome MV3)
+  if (typeof localStorage === 'undefined') {
+    logDebug('localStorage not available (service worker context)');
+    return;
+  }
+
   try {
     const config = {
       enabled: settings.enabled,
@@ -67,21 +73,15 @@ export async function loadSettings(): Promise<LsSettings> {
 
     if (stored) {
       logDebug('Loaded settings from storage:', stored);
-      const validated = validateSettings(stored);
-      syncToLocalStorage(validated);
-      return validated;
+      return validateSettings(stored);
     }
 
     // No stored settings, return defaults
     logDebug('No stored settings found, using defaults');
-    const defaults = validateSettings({});
-    syncToLocalStorage(defaults);
-    return defaults;
+    return validateSettings({});
   } catch (error) {
     logError('Failed to load settings:', error);
-    const defaults = validateSettings({});
-    syncToLocalStorage(defaults);
-    return defaults;
+    return validateSettings({});
   }
 }
 
@@ -99,7 +99,6 @@ export async function updateSettings(updates: Partial<Omit<LsSettings, 'version'
 
     // Save to storage
     await browser.storage.local.set({ [STORAGE_KEY]: merged });
-    syncToLocalStorage(merged);
 
     logDebug('Updated settings:', merged);
   } catch (error) {
@@ -118,7 +117,6 @@ export async function initializeSettings(): Promise<void> {
 
     if (!result[STORAGE_KEY]) {
       await browser.storage.local.set({ [STORAGE_KEY]: DEFAULT_SETTINGS });
-      syncToLocalStorage(DEFAULT_SETTINGS);
       logDebug('Initialized default settings');
     }
   } catch (error) {

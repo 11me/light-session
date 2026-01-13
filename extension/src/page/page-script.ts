@@ -48,6 +48,48 @@ const DEFAULT_CONFIG: LsConfig = {
   debug: false,
 };
 
+// ============================================================================
+// Config Ready Gating
+// ============================================================================
+
+/**
+ * Promise that resolves when config is ready (from localStorage or CustomEvent).
+ * First fetch waits on this to ensure correct config is used.
+ */
+let resolveConfigReady: (() => void) | null = null;
+const configReady = new Promise<void>((resolve) => {
+  resolveConfigReady = resolve;
+});
+
+/**
+ * Resolve the configReady promise (idempotent - only resolves once).
+ */
+function tryResolveConfigReady(): void {
+  if (resolveConfigReady) {
+    resolveConfigReady();
+    resolveConfigReady = null;
+  }
+}
+
+/**
+ * Wait for config to be ready with timeout.
+ * Returns immediately if config already loaded.
+ * After timeout, marks config as ready to avoid repeated delays on subsequent fetches.
+ * @param timeoutMs Max time to wait (default 50ms)
+ */
+async function ensureConfigReady(timeoutMs = 50): Promise<void> {
+  if (!resolveConfigReady) {
+    // Already resolved
+    return;
+  }
+  await Promise.race([
+    configReady,
+    new Promise<void>((resolve) => setTimeout(resolve, timeoutMs)),
+  ]);
+  // After timeout (or config arrived), mark as ready so subsequent fetches don't wait
+  tryResolveConfigReady();
+}
+
 /**
  * localStorage key - must match storage.ts LOCAL_STORAGE_KEY
  */
@@ -197,13 +239,6 @@ async function interceptedFetch(
   nativeFetch: typeof fetch,
   ...args: Parameters<typeof fetch>
 ): Promise<Response> {
-  const cfg = getConfig();
-
-  // Skip if disabled
-  if (!cfg.enabled) {
-    return nativeFetch(...args);
-  }
-
   // Extract URL/method BEFORE fetching (handles string, URL, Request)
   // This avoids "Body has already been consumed" error when args[0] is a Request
   const [input, init] = args;
@@ -223,8 +258,18 @@ async function interceptedFetch(
 
   const url = new URL(urlString, location.href);
 
-  // Early return for non-matching requests (before fetching)
+  // Early return for non-matching requests - no config wait needed
   if (!isConversationRequest(method, url)) {
+    return nativeFetch(...args);
+  }
+
+  // Wait for config only for ChatGPT API requests (max 50ms on first request)
+  await ensureConfigReady();
+
+  const cfg = getConfig();
+
+  // Skip if disabled
+  if (!cfg.enabled) {
     return nativeFetch(...args);
   }
 
@@ -355,6 +400,9 @@ function setupConfigListener(): void {
         debug: config.debug ?? DEFAULT_CONFIG.debug,
       };
       log('Config updated:', window.__LS_CONFIG__);
+
+      // Signal that config is ready (unblocks first fetch)
+      tryResolveConfigReady();
     }
   }) as EventListener);
 }
@@ -367,6 +415,14 @@ function setupConfigListener(): void {
   // Initialize debug flag
   if (typeof window.__LS_DEBUG__ === 'undefined') {
     window.__LS_DEBUG__ = false;
+  }
+
+  // Check localStorage first - if already synced by page-inject, resolve immediately
+  const stored = loadFromLocalStorage();
+  if (stored) {
+    window.__LS_CONFIG__ = stored;
+    window.__LS_DEBUG__ = stored.debug;
+    tryResolveConfigReady();
   }
 
   setupConfigListener();

@@ -15,24 +15,28 @@ const STORAGE_KEY = 'ls_settings';
 const LOCAL_STORAGE_KEY = 'ls_config';
 
 /**
- * Sync settings from browser.storage to localStorage.
- * This runs BEFORE page-script injection to ensure localStorage has correct data.
+ * Sync settings from browser.storage to localStorage AND dispatch CustomEvent.
+ * Runs in parallel with page-script injection. The CustomEvent signals config ready
+ * to page-script, allowing it to gate first fetch until config is available.
  */
 async function syncSettingsToLocalStorage(): Promise<void> {
   try {
     const result = await browser.storage.local.get(STORAGE_KEY);
     const stored = result[STORAGE_KEY] as { enabled?: boolean; keep?: number; debug?: boolean } | undefined;
-    
+
     if (stored) {
       const config = {
         enabled: stored.enabled ?? true,
         limit: stored.keep ?? 10,
         debug: stored.debug ?? false,
       };
+      // Write to localStorage for page-script access
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(config));
+      // Dispatch event immediately - faster than waiting for content.ts (document_idle)
+      window.dispatchEvent(new CustomEvent('lightsession-config', { detail: JSON.stringify(config) }));
     }
   } catch {
-    // Storage access failed - page-script will use defaults or existing localStorage
+    // Storage access failed - page-script will use defaults after timeout
   }
 }
 
@@ -57,8 +61,9 @@ function injectPageScript(): void {
 }
 
 // Main execution:
-// 1. Start syncing settings (async, but fast)
-// 2. Inject page script immediately (can't wait - need to patch fetch early)
-// The sync will complete and update localStorage, which page-script checks on each fetch.
-void syncSettingsToLocalStorage();
+// 1. Inject page script IMMEDIATELY to patch fetch before ChatGPT's code runs
+// 2. Sync localStorage in parallel (best effort for first fetch)
+// 3. content.ts will dispatch config via CustomEvent as fallback
+// Priority is early patching - page-script uses defaults if localStorage not ready.
 injectPageScript();
+void syncSettingsToLocalStorage();
