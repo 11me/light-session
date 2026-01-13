@@ -11,7 +11,7 @@
 
 import browser from '../shared/browser-polyfill';
 import type { LsSettings, TrimStatus } from '../shared/types';
-import { loadSettings, validateSettings } from '../shared/storage';
+import { loadSettings, validateSettings, syncToLocalStorage } from '../shared/storage';
 import { TIMING } from '../shared/constants';
 import { setDebugMode, logDebug, logInfo, logWarn, logError } from '../shared/logger';
 import {
@@ -199,6 +199,10 @@ function handleStorageChange(
   // Validate settings to ensure proper types and ranges
   const newSettings = validateSettings(changes.ls_settings.newValue as Partial<LsSettings>);
   logInfo('Settings changed via storage:', newSettings);
+
+  // Sync to localStorage for page-script access (Chrome MV3 workaround)
+  syncToLocalStorage(newSettings);
+
   applySettings(newSettings);
 }
 
@@ -295,6 +299,9 @@ async function initialize(): Promise<void> {
     // Load initial settings
     const settings = await loadSettings();
     logInfo('Loaded settings:', settings);
+
+    // Sync to localStorage for page-script access (Chrome MV3 workaround)
+    syncToLocalStorage(settings);
 
     // Apply settings
     applySettings(settings);

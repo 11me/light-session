@@ -80,6 +80,13 @@ export interface PongMessage {
 }
 
 /**
+ * Error response from message handler
+ */
+export interface ErrorResponse {
+  error: string;
+}
+
+/**
  * Union of all runtime messages
  */
 export type RuntimeMessage = GetSettingsMessage | SetSettingsMessage | PingMessage;
@@ -87,4 +94,4 @@ export type RuntimeMessage = GetSettingsMessage | SetSettingsMessage | PingMessa
 /**
  * Union of all runtime responses
  */
-export type RuntimeResponse = GetSettingsResponse | SetSettingsResponse | PongMessage;
+export type RuntimeResponse = GetSettingsResponse | SetSettingsResponse | PongMessage | ErrorResponse;
