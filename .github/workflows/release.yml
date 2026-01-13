@@ -44,6 +44,14 @@ jobs:
       - name: Build Firefox extension
         run: npm run build:prod:firefox
 
+      - name: Verify Firefox manifest
+        run: |
+          if ! grep -q '"scripts"' extension/manifest.json; then
+            echo "::error::Firefox manifest not applied (missing background.scripts)"
+            exit 1
+          fi
+          echo "✓ Firefox manifest verified"
+
       - name: Create Firefox extension zip
         run: |
           cd extension
@@ -59,6 +67,18 @@ jobs:
       # =========================================================================
       - name: Build Chrome extension
         run: npm run build:prod:chrome
+
+      - name: Verify Chrome manifest
+        run: |
+          if ! grep -q '"service_worker"' extension/manifest.json; then
+            echo "::error::Chrome manifest not applied (missing background.service_worker)"
+            exit 1
+          fi
+          if grep -q 'browser_specific_settings' extension/manifest.json; then
+            echo "::error::Chrome manifest contains Firefox-specific settings"
+            exit 1
+          fi
+          echo "✓ Chrome manifest verified"
 
       - name: Create Chrome extension zip
         run: |
@@ -134,7 +154,7 @@ jobs:
       # Firefox Add-ons Publishing
       # =========================================================================
       - name: Publish to Firefox Add-ons
-        uses: browser-actions/release-firefox-addon@latest
+        uses: browser-actions/release-firefox-addon@v0.2.1
         with:
           addon-id: ${{ secrets.FIREFOX_ADDON_ID }}
           addon-path: light-session-${{ steps.version.outputs.VERSION }}-firefox.zip
@@ -146,7 +166,7 @@ jobs:
       # Chrome Web Store Publishing
       # =========================================================================
       - name: Publish to Chrome Web Store
-        uses: browser-actions/release-chrome-extension@latest
+        uses: browser-actions/release-chrome-extension@v0.2.1
         with:
           extension-id: ${{ secrets.CHROME_EXTENSION_ID }}
           extension-path: light-session-${{ steps.version.outputs.VERSION }}-chrome.zip
