@@ -4,7 +4,7 @@ Keep ChatGPT fast by keeping only the last N messages in the DOM.
 Local-only, privacy-first browser extension that fixes UI lag in long conversations.
 
 [![Firefox Add-on](https://img.shields.io/amo/v/lightsession-for-chatgpt?label=Firefox%20Add-on)](https://addons.mozilla.org/en-US/firefox/addon/lightsession-for-chatgpt/)
-[![Users](https://img.shields.io/amo/users/lightsession-for-chatgpt)](https://addons.mozilla.org/en-US/firefox/addon/lightsession-for-chatgpt/)
+[![Chrome Web Store](https://img.shields.io/chrome-web-store/v/fhloegjhggnokmkboompifoabpbcplgd?label=Chrome%20Web%20Store)](https://chromewebstore.google.com/detail/lightsession-pro-for-chat/fhloegjhggnokmkboompifoabpbcplgd)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ---
@@ -19,7 +19,7 @@ Long ChatGPT threads are brutal for the browser: the UI keeps every message in t
 - **Keeps model context intact** (only the DOM is trimmed)
 - **100% local** – no servers, no analytics, no tracking
 
-Built after too many coding sessions where a single ChatGPT tab would start eating CPU and turn Firefox into a slideshow.
+Built after too many coding sessions where a single ChatGPT tab would start eating CPU and turn the browser into a slideshow.
 
 ---
 
@@ -27,7 +27,7 @@ Built after too many coding sessions where a single ChatGPT tab would start eati
 
 - People who keep **very long ChatGPT threads** (100+ messages)
 - Developers who use ChatGPT for **debugging, code reviews, or long refactors**
-- Anyone whose ChatGPT tab becomes **sluggish after a while** in Firefox
+- Anyone whose ChatGPT tab becomes **sluggish after a while**
 
 ---
 
@@ -57,14 +57,18 @@ Built after too many coding sessions where a single ChatGPT tab would start eati
 
 ## 📦 Install
 
-### Firefox Add-ons (recommended)
+### Firefox
 
-**[Install from AMO](https://addons.mozilla.org/en-US/firefox/addon/lightsession-for-chatgpt/)**
+**[Install from Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/lightsession-for-chatgpt/)**
 
-After installation:
+### Chrome
+
+**[Install from Chrome Web Store](https://chromewebstore.google.com/detail/lightsession-pro-for-chat/fhloegjhggnokmkboompifoabpbcplgd)**
+
+### After installation
 
 1. Open any ChatGPT conversation.
-2. Click the LightSession icon in your Firefox toolbar.
+2. Click the LightSession icon in your browser toolbar.
 3. Make sure the extension is **enabled**.
 4. Adjust how many messages to keep if needed.
 
@@ -73,19 +77,25 @@ After installation:
 ```bash
 git clone https://github.com/11me/light-session.git
 cd light-session
-
-# Install dependencies
 npm install
 
-# Build the extension
-npm run build
+# Build for Firefox
+npm run build:firefox
+
+# Build for Chrome
+npm run build:chrome
 ```
 
-Then:
+**Firefox:**
+1. Open `about:debugging#/runtime/this-firefox`
+2. Click **Load Temporary Add-on**
+3. Select `extension/manifest.json`
 
-1. Open `about:debugging#/runtime/this-firefox` in Firefox.
-2. Click **Load Temporary Add-on**.
-3. Select `extension/manifest.json`.
+**Chrome:**
+1. Open `chrome://extensions`
+2. Enable **Developer mode**
+3. Click **Load unpacked**
+4. Select the `extension/` folder
 
 ---
 
@@ -167,40 +177,30 @@ Trimming only affects what the browser renders. The conversation itself remains 
 
 - Node.js >= 24.10.0 (see `.node-version`)
 - npm >= 10
-- Firefox >= 115
+- Firefox >= 115 or Chrome >= 120
 
 ### Scripts
 
 ```bash
-# Install dependencies
-npm install
+npm install              # Install dependencies
 
-# Build once
-npm run build
+# Build
+npm run build            # Build for Firefox (default)
+npm run build:firefox    # Build for Firefox
+npm run build:chrome     # Build for Chrome
 
-# Watch + rebuild on changes
-npm run watch
+# Development
+npm run dev              # Run in Firefox Developer Edition
+npm run watch:chrome     # Watch mode for Chrome
 
-# Run tests
-npm run test
+# Quality
+npm run test             # Run tests
+npm run lint             # Lint
+npm run build:types      # Type check
 
-# Lint
-npm run lint
-
-# Format
-npm run format
-
-# Run in Firefox Developer Edition
-npm run dev
-
-# Run in Firefox (stable)
-npm run dev:stable
-
-# Package for distribution
-npm run package
-
-# Clean build artifacts
-npm run clean
+# Package
+npm run package          # Package for Firefox (web-ext-artifacts/)
+npm run package:chrome   # Package for Chrome (ZIP)
 ```
 
 ### Project structure
@@ -210,12 +210,14 @@ extension/
 ├── src/
 │   ├── content/        # Content scripts (settings dispatch, status bar)
 │   ├── page/           # Page script (Fetch Proxy, runs in page context)
-│   ├── background/     # Background script (settings management)
+│   ├── background/     # Background service worker
 │   ├── popup/          # Popup UI (HTML/CSS/JS)
 │   └── shared/         # Shared types, constants, utilities
 ├── dist/               # Compiled output (TypeScript → JavaScript)
 ├── icons/              # Extension icons
-└── manifest.json       # Firefox extension manifest
+├── manifest.firefox.json  # Firefox manifest (MV3)
+├── manifest.chrome.json   # Chrome manifest (MV3)
+└── manifest.json          # Active manifest (symlink/copy from build)
 ```
 
 ### Architecture
@@ -229,12 +231,9 @@ extension/
 
 ## 🌐 Compatibility
 
-- **Browser:** Firefox >= 115 (Manifest V3)
+- **Browsers:** Firefox >= 115, Chrome >= 120 (Manifest V3)
 - **OS:** Windows, macOS, Linux
 - **ChatGPT:** Optimized for the current UI (2025), resilient to small layout changes
-
-> This repository contains the **Firefox** implementation.
-> A separate **Chrome** version is available on the Chrome Web Store.
 
 ---
 
