@@ -8,6 +8,12 @@ import type { RuntimeMessage, RuntimeResponse } from '../shared/types';
 import { initializeSettings, loadSettings, updateSettings } from '../shared/storage';
 import { setDebugMode, logDebug, logError } from '../shared/logger';
 import { createMessageHandler } from '../shared/messages';
+import {
+  disableActionByDefault,
+  ensureDeclarativeActionRules,
+  syncActionStateForAllTabs,
+  updateActionForTab,
+} from './action-state';
 
 /**
  * Initialize background script
@@ -21,6 +27,14 @@ async function initialize(): Promise<void> {
   // Load settings and apply debug mode
   const settings = await loadSettings();
   setDebugMode(settings.debug);
+
+  // Disable action by default, then enable per-tab where applicable
+  disableActionByDefault();
+
+  await ensureDeclarativeActionRules();
+
+  // Set initial action state across existing tabs
+  await syncActionStateForAllTabs();
 
   logDebug('Background script initialized');
 }
@@ -69,6 +83,38 @@ browser.storage.onChanged.addListener((changes, areaName) => {
       setDebugMode(newSettings.debug);
       logDebug('Debug mode updated from storage change');
     }
+  }
+});
+
+browser.runtime.onInstalled.addListener(() => {
+  disableActionByDefault();
+  void ensureDeclarativeActionRules();
+  void syncActionStateForAllTabs();
+});
+
+browser.runtime.onStartup.addListener(() => {
+  disableActionByDefault();
+  void ensureDeclarativeActionRules();
+  void syncActionStateForAllTabs();
+});
+
+// Enable action only on ChatGPT tabs
+browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.url) {
+    updateActionForTab(tabId, changeInfo.url);
+    return;
+  }
+  if (changeInfo.status === 'complete') {
+    updateActionForTab(tabId, tab.url);
+  }
+});
+
+browser.tabs.onActivated.addListener(async ({ tabId }) => {
+  try {
+    const tab = await browser.tabs.get(tabId);
+    updateActionForTab(tabId, tab.url);
+  } catch {
+    // Ignore failures on restricted tabs
   }
 });
 

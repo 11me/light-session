@@ -121,8 +121,16 @@ describe('manifest consistency', () => {
     expect(firefoxManifest.description).toBe(chromeManifest.description);
   });
 
-  it('both manifests have the same permissions', () => {
-    expect(firefoxManifest.permissions.sort()).toEqual(chromeManifest.permissions.sort());
+  it('chrome permissions include firefox permissions (plus chrome-only)', () => {
+    const firefoxPerms = new Set(firefoxManifest.permissions);
+    const chromePerms = new Set(chromeManifest.permissions);
+
+    for (const perm of firefoxPerms) {
+      expect(chromePerms.has(perm)).toBe(true);
+    }
+
+    const extraChromePerms = [...chromePerms].filter((perm) => !firefoxPerms.has(perm));
+    expect(extraChromePerms.sort()).toEqual(['declarativeContent']);
   });
 
   it('both manifests have the same host_permissions', () => {

@@ -20,6 +20,7 @@ import {
   refreshStatusBar,
   setStatusBarVisibility,
 } from './status-bar';
+import { isEmptyChatView } from './chat-view';
 
 
 // ============================================================================
@@ -53,6 +54,9 @@ function isValidTrimStatus(obj: unknown): obj is TrimStatus {
 
 let currentSettings: LsSettings | null = null;
 let proxyReady = false;
+let emptyChatState = false;
+let emptyChatCheckTimer: number | null = null;
+let emptyChatObserver: MutationObserver | null = null;
 
 // ============================================================================
 // Page Script Communication
@@ -256,6 +260,43 @@ function setupNavigationDetection(): void {
 }
 
 // ============================================================================
+// Empty Chat Detection
+// ============================================================================
+
+function checkEmptyChatView(): void {
+  const isEmpty = isEmptyChatView(document);
+  if (isEmpty && !emptyChatState) {
+    resetAccumulatedTrimmed();
+    refreshStatusBar();
+  }
+  emptyChatState = isEmpty;
+}
+
+function scheduleEmptyChatCheck(): void {
+  if (emptyChatCheckTimer !== null) {
+    return;
+  }
+
+  emptyChatCheckTimer = window.setTimeout(() => {
+    emptyChatCheckTimer = null;
+    checkEmptyChatView();
+  }, 200);
+}
+
+function setupEmptyChatObserver(): void {
+  if (emptyChatObserver) {
+    return;
+  }
+
+  emptyChatObserver = new MutationObserver(() => {
+    scheduleEmptyChatCheck();
+  });
+
+  emptyChatObserver.observe(document.body, { childList: true, subtree: true });
+  scheduleEmptyChatCheck();
+}
+
+// ============================================================================
 // Initialization
 // ============================================================================
 
@@ -312,6 +353,9 @@ async function initialize(): Promise<void> {
 
     // Set up navigation detection
     setupNavigationDetection();
+
+    // Detect empty chat state to reset stale status
+    setupEmptyChatObserver();
 
     // Check proxy status after a short delay
     setTimeout(checkProxyStatus, TIMING.PROXY_READY_TIMEOUT_MS);
