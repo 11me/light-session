@@ -109,13 +109,15 @@ browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 });
 
-browser.tabs.onActivated.addListener(async ({ tabId }) => {
-  try {
-    const tab = await browser.tabs.get(tabId);
-    updateActionForTab(tabId, tab.url);
-  } catch {
-    // Ignore failures on restricted tabs
-  }
+browser.tabs.onActivated.addListener(({ tabId }) => {
+  void (async () => {
+    try {
+      const tab = await browser.tabs.get(tabId);
+      updateActionForTab(tabId, tab.url);
+    } catch {
+      // Ignore failures on restricted tabs
+    }
+  })();
 });
 
 // Register message listener
