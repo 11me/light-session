@@ -6,6 +6,7 @@ const TURN_SELECTORS = [
   '[data-testid="conversation-turn"]',
   '[data-message-id]',
   '[data-message-author-role]',
+  'article',
 ];
 
 export function hasConversationTurns(root: ParentNode): boolean {

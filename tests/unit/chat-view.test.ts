@@ -37,4 +37,11 @@ describe('chat view helpers', () => {
     expect(hasConversationTurns(document)).toBe(true);
     expect(isEmptyChatView(document)).toBe(false);
   });
+
+  it('detects conversation turns by article elements', () => {
+    document.body.innerHTML = '<main><article>Hi</article></main>';
+
+    expect(hasConversationTurns(document)).toBe(true);
+    expect(isEmptyChatView(document)).toBe(false);
+  });
 });
