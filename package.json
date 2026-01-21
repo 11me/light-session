@@ -1,6 +1,6 @@
 {
   "name": "light-session",
-  "version": "1.6.2",
+  "version": "1.6.3",
   "type": "module",
   "description": "LightSession Pro - Browser extension to optimize ChatGPT performance",
   "engines": {
