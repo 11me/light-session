@@ -292,7 +292,7 @@ function setupEmptyChatObserver(): void {
     scheduleEmptyChatCheck();
   });
 
-  emptyChatObserver.observe(document.body, { childList: true, subtree: true });
+  emptyChatObserver.observe(document.documentElement, { childList: true, subtree: true });
   scheduleEmptyChatCheck();
 }
 

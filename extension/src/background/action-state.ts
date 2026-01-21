@@ -92,6 +92,14 @@ export async function syncActionStateForAllTabs(): Promise<void> {
       updateActionForTab(tab.id, tab.url);
     }
   } catch {
-    // Ignore tab query failures
+    try {
+      const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+      for (const tab of tabs) {
+        if (!tab?.id) continue;
+        updateActionForTab(tab.id, tab.url);
+      }
+    } catch {
+      // Ignore tab query failures
+    }
   }
 }

@@ -91,6 +91,8 @@ async function ensureConfigReady(timeoutMs = 50): Promise<void> {
 }
 
 let configReceived = false;
+const CONFIG_FALLBACK_TIMEOUT_MS = 2000;
+const configStartTime = Date.now();
 
 /**
  * localStorage key - must match storage.ts LOCAL_STORAGE_KEY
@@ -164,6 +166,7 @@ function getConfig(): LsConfig {
   // Fall back to window config (set by content script events)
   const cfg = window.__LS_CONFIG__;
   if (cfg) {
+    configReceived = true;
     return {
       enabled: cfg.enabled ?? DEFAULT_CONFIG.enabled,
       limit: Math.max(1, cfg.limit ?? DEFAULT_CONFIG.limit),
@@ -272,6 +275,14 @@ async function interceptedFetch(
   const cfg = getConfig();
 
   // If config was never received, avoid trimming to prevent incorrect behavior.
+  if (!configReceived) {
+    if (Date.now() - configStartTime > CONFIG_FALLBACK_TIMEOUT_MS) {
+      configReceived = true;
+    } else {
+      return nativeFetch(...args);
+    }
+  }
+
   if (!configReceived) {
     return nativeFetch(...args);
   }

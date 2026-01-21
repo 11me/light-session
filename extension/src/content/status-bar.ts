@@ -309,6 +309,10 @@ export function resetAccumulatedTrimmed(): void {
   accumulatedTrimmed = 0;
   currentStats = null;
   pendingStats = null;
+  if (pendingUpdateTimer !== null) {
+    clearTimeout(pendingUpdateTimer);
+    pendingUpdateTimer = null;
+  }
 
   if (!isVisible) {
     return;

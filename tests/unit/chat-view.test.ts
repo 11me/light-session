@@ -30,4 +30,11 @@ describe('chat view helpers', () => {
     expect(hasConversationTurns(document)).toBe(true);
     expect(isEmptyChatView(document)).toBe(false);
   });
+
+  it('detects conversation turns by author role', () => {
+    document.body.innerHTML = '<main><div data-message-author-role="assistant"></div></main>';
+
+    expect(hasConversationTurns(document)).toBe(true);
+    expect(isEmptyChatView(document)).toBe(false);
+  });
 });

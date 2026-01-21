@@ -110,6 +110,18 @@ describe('action state', () => {
     expect(mockedBrowser.action.setPopup).toHaveBeenCalledWith({ tabId: 2, popup: '' });
   });
 
+  it('falls back to active tab when full query fails', async () => {
+    mockedBrowser.tabs.query
+      .mockRejectedValueOnce(new Error('query failed'))
+      .mockResolvedValueOnce([{ id: 3, url: 'https://chatgpt.com/' }]);
+
+    await syncActionStateForAllTabs();
+
+    expect(mockedBrowser.tabs.query).toHaveBeenNthCalledWith(1, {});
+    expect(mockedBrowser.tabs.query).toHaveBeenNthCalledWith(2, { active: true, currentWindow: true });
+    expect(mockedBrowser.action.enable).toHaveBeenCalledWith(3);
+  });
+
   it('disables action by default', () => {
     disableActionByDefault();
     expect(mockedBrowser.action.disable).toHaveBeenCalledWith();
