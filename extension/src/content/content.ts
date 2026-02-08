@@ -22,6 +22,7 @@ import {
 } from './status-bar';
 import { isEmptyChatView } from './chat-view';
 import { installUserCollapse, type UserCollapseController } from './user-collapse';
+import { isLightSessionRejection } from './rejection-filter';
 
 
 // ============================================================================
@@ -412,6 +413,23 @@ window.addEventListener('error', (event) => {
 });
 
 window.addEventListener('unhandledrejection', (event) => {
-  logError('Unhandled promise rejection:', event.reason);
-  event.preventDefault();
+  let extensionUrlPrefix: string | undefined;
+  try {
+    extensionUrlPrefix = browser?.runtime?.getURL?.('');
+  } catch {
+    extensionUrlPrefix = undefined;
+  }
+
+  // Do not suppress site (ChatGPT) errors. Only suppress if it clearly originates from LightSession.
+  const strictIsOurs = isLightSessionRejection(event.reason, extensionUrlPrefix);
+  const looseIsOurs = isLightSessionRejection(event.reason);
+
+  if (strictIsOurs || looseIsOurs) {
+    logError('Unhandled promise rejection:', event.reason);
+
+    // Only suppress default reporting if we are confident this originates from our extension.
+    if (strictIsOurs) {
+      event.preventDefault();
+    }
+  }
 });
