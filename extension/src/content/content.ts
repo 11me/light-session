@@ -21,6 +21,7 @@ import {
   setStatusBarVisibility,
 } from './status-bar';
 import { isEmptyChatView } from './chat-view';
+import { installUserCollapse, type UserCollapseController } from './user-collapse';
 
 
 // ============================================================================
@@ -57,6 +58,7 @@ let proxyReady = false;
 let emptyChatState = false;
 let emptyChatCheckTimer: number | null = null;
 let emptyChatObserver: MutationObserver | null = null;
+let userCollapse: UserCollapseController | null = null;
 
 // ============================================================================
 // Page Script Communication
@@ -170,6 +172,17 @@ function applySettings(settings: LsSettings): void {
 
   // Apply Ultra Lean CSS mode (works independently of trimmer)
   setUltraLeanMode(settings.ultraLean);
+
+  // Collapse long user messages (presentation-only; local DOM feature)
+  if (settings.enabled) {
+    if (!userCollapse) {
+      userCollapse = installUserCollapse();
+    }
+    userCollapse.enable();
+  } else if (userCollapse) {
+    userCollapse.teardown();
+    userCollapse = null;
+  }
 
   logDebug('Settings applied:', settings);
 }
