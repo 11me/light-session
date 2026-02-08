@@ -56,6 +56,34 @@ describe('status bar behavior', () => {
     expect(resetBar?.textContent).toBe(WAITING_TEXT);
   });
 
+  it('does not accumulate trimmed messages across repeated status events', () => {
+    vi.useFakeTimers();
+    showStatusBar();
+
+    updateStatusBar({
+      totalMessages: 8,
+      visibleMessages: 3,
+      trimmedMessages: 5,
+      keepLastN: 3,
+    });
+    vi.advanceTimersByTime(TIMING.STATUS_BAR_THROTTLE_MS);
+
+    const bar = document.getElementById('lightsession-status-bar');
+    expect(bar?.textContent).toBe('LightSession · last 3 · 5 trimmed');
+
+    // Repeated status event with the same absolute "currently trimmed" count
+    updateStatusBar({
+      totalMessages: 8,
+      visibleMessages: 3,
+      trimmedMessages: 5,
+      keepLastN: 3,
+    });
+    vi.advanceTimersByTime(TIMING.STATUS_BAR_THROTTLE_MS);
+
+    const bar2 = document.getElementById('lightsession-status-bar');
+    expect(bar2?.textContent).toBe('LightSession · last 3 · 5 trimmed');
+  });
+
   it('refreshes the status bar if the DOM node is removed', () => {
     vi.useFakeTimers();
     showStatusBar();

@@ -19,7 +19,6 @@ type StatusBarState = 'active' | 'waiting' | 'all-visible' | 'unrecognized';
 
 let currentStats: StatusBarStats | null = null;
 let isVisible = true;
-let accumulatedTrimmed = 0;
 
 // Throttle status bar updates to reduce DOM writes during active chat
 let lastUpdateTime = 0;
@@ -174,21 +173,9 @@ function renderWaitingStatusBar(bar: HTMLElement): void {
  * Update the status bar with new stats (throttled, with change detection)
  */
 export function updateStatusBar(stats: StatusBarStats): void {
-  // Reset accumulated count when entering a new/empty chat
-  if (stats.totalMessages === 0) {
-    accumulatedTrimmed = 0;
-  }
-
-  // Accumulate trimmed count
-  if (stats.trimmedMessages > 0) {
-    accumulatedTrimmed += stats.trimmedMessages;
-  }
-
-  // Use accumulated count for display
-  const displayStats: StatusBarStats = {
-    ...stats,
-    trimmedMessages: accumulatedTrimmed,
-  };
+  // Page-script reports an absolute "currently hidden" count (not a delta),
+  // so the status bar must not accumulate across repeated status events.
+  const displayStats: StatusBarStats = stats;
 
   // Change detection: skip if stats haven't changed
   if (statsEqual(displayStats, currentStats)) {
@@ -298,15 +285,13 @@ export function removeStatusBar(): void {
   }
   currentStats = null;
   isVisible = false;
-  accumulatedTrimmed = 0;
   lastUpdateTime = 0;
 }
 
 /**
- * Reset accumulated trimmed counter (call on chat navigation)
+ * Reset status bar state (call on chat navigation / empty chat)
  */
 export function resetAccumulatedTrimmed(): void {
-  accumulatedTrimmed = 0;
   currentStats = null;
   pendingStats = null;
   if (pendingUpdateTimer !== null) {
