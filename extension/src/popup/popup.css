@@ -842,3 +842,16 @@ body {
     transform: translateY(0);
   }
 }
+
+/* Ensure dark-mode component overrides win the cascade (placed at end). */
+@media (prefers-color-scheme: dark) {
+  .ls-status:not(:empty) {
+    background: rgba(16, 185, 129, 0.12);
+    color: #bbf7d0;
+  }
+
+  .ls-status.error {
+    background: rgba(239, 68, 68, 0.14);
+    color: #fecaca;
+  }
+}
