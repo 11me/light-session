@@ -44,6 +44,7 @@ describe('validateSettings', () => {
     expect(result.enabled).toBe(DEFAULT_SETTINGS.enabled);
     expect(result.keep).toBe(DEFAULT_SETTINGS.keep);
     expect(result.showStatusBar).toBe(DEFAULT_SETTINGS.showStatusBar);
+    expect(result.collapseLongUserMessages).toBe(DEFAULT_SETTINGS.collapseLongUserMessages);
     expect(result.debug).toBe(DEFAULT_SETTINGS.debug);
     expect(result.ultraLean).toBe(DEFAULT_SETTINGS.ultraLean);
   });
@@ -53,6 +54,7 @@ describe('validateSettings', () => {
       enabled: false,
       keep: 20,
       showStatusBar: false,
+      collapseLongUserMessages: false,
       debug: true,
       ultraLean: true,
     };
@@ -62,6 +64,7 @@ describe('validateSettings', () => {
     expect(result.enabled).toBe(false);
     expect(result.keep).toBe(20);
     expect(result.showStatusBar).toBe(false);
+    expect(result.collapseLongUserMessages).toBe(false);
     expect(result.debug).toBe(true);
     expect(result.ultraLean).toBe(true);
   });
@@ -97,6 +100,7 @@ describe('validateSettings', () => {
     expect(result.enabled).toBe(false);
     expect(result.keep).toBe(DEFAULT_SETTINGS.keep);
     expect(result.showStatusBar).toBe(DEFAULT_SETTINGS.showStatusBar);
+    expect(result.collapseLongUserMessages).toBe(DEFAULT_SETTINGS.collapseLongUserMessages);
     expect(result.debug).toBe(DEFAULT_SETTINGS.debug);
   });
 

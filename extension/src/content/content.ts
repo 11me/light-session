@@ -174,7 +174,8 @@ function applySettings(settings: LsSettings): void {
   setUltraLeanMode(settings.ultraLean);
 
   // Collapse long user messages (presentation-only; local DOM feature)
-  if (settings.enabled) {
+  const shouldCollapseLongUserMessages = settings.enabled && settings.collapseLongUserMessages;
+  if (shouldCollapseLongUserMessages) {
     if (!userCollapse) {
       userCollapse = installUserCollapse();
     }
