@@ -7,6 +7,8 @@
    CSS Custom Properties (Design Tokens)
    ============================================ */
 :root {
+  color-scheme: light;
+
   /* Primary Brand Colors */
   --ls-primary-50: #ecfdf5;
   --ls-primary-100: #d1fae5;
@@ -86,6 +88,126 @@
   --ls-transition-base: 200ms ease;
   --ls-transition-slow: 300ms ease;
   --ls-transition-spring: 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ============================================
+   Auto Dark Mode
+   - Follows OS/browser setting via prefers-color-scheme
+   - Override tokens so existing component styles adapt automatically
+   ============================================ */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    /* Brand green: a bit darker/less neon in dark mode */
+    --ls-primary-400: #2fbf8f;
+    --ls-primary-500: #059669;
+    --ls-primary-600: #047857;
+    --ls-primary-700: #065f46;
+
+    /*
+     * Dark surfaces:
+     * - Keep it mostly neutral (less "navy") so brand green reads premium.
+     * - Use a slightly lighter card surface for depth.
+     */
+    --ls-gray-50: #070a13;  /* app background */
+    --ls-gray-100: #0b1220; /* content background */
+    --ls-gray-200: #111a2e; /* tracks / subtle fills */
+    --ls-gray-300: #233252; /* borders */
+
+    /* Text ladder (raise contrast vs the first pass) */
+    --ls-gray-400: #64748b; /* tertiary */
+    --ls-gray-500: #94a3b8; /* secondary */
+    --ls-gray-600: #cbd5e1; /* titles */
+    --ls-gray-700: #e2e8f0; /* primary */
+    --ls-gray-800: #f1f5f9;
+    --ls-gray-900: #ffffff;
+
+    --ls-surface-primary: #0f172a; /* cards / main surface */
+    --ls-surface-secondary: #0b1220;
+
+    /* Dark-appropriate elevation (combine shadow + hairline border) */
+    --ls-shadow-xs: 0 1px 0 rgba(255, 255, 255, 0.03);
+    --ls-shadow-sm: 0 8px 20px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.06);
+    --ls-shadow-md: 0 14px 34px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.06);
+    --ls-shadow-lg: 0 22px 50px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.06);
+    --ls-shadow-glow: 0 0 0 3px rgba(16, 185, 129, 0.18);
+
+    /* Semantic backgrounds tuned for dark surfaces */
+    --ls-warning-bg: rgba(245, 158, 11, 0.14);
+    --ls-warning-text: #fbbf24;
+    --ls-error-bg: rgba(239, 68, 68, 0.14);
+
+    /* Support accents tuned for dark surfaces */
+    --ls-pink-50: rgba(236, 72, 153, 0.1);
+    --ls-pink-100: rgba(236, 72, 153, 0.16);
+    --ls-pink-border: rgba(236, 72, 153, 0.35);
+  }
+
+  body {
+    background: var(--ls-gray-50);
+    color: var(--ls-gray-700);
+  }
+
+  /* Atmosphere: subtle ambient gradients for a less "flat" dark UI */
+  .ls-popup {
+    background:
+      radial-gradient(900px circle at 10% 0%, rgba(16, 185, 129, 0.12), transparent 40%),
+      radial-gradient(700px circle at 95% 10%, rgba(236, 72, 153, 0.10), transparent 44%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 40%),
+      var(--ls-gray-50);
+  }
+
+  .ls-main {
+    /* Let the ambient popup background show through */
+    background: transparent;
+  }
+
+  /* Give cards depth on dark without looking "glossy" */
+  .ls-card {
+    border: 1px solid rgba(148, 163, 184, 0.12);
+    box-shadow: var(--ls-shadow-sm);
+    backdrop-filter: blur(10px);
+    background: rgba(15, 23, 42, 0.72);
+  }
+
+  /* Tone down the header in dark mode (less bright, more refined) */
+  .ls-header {
+    background:
+      linear-gradient(135deg, rgba(16, 185, 129, 0.18) 0%, rgba(16, 185, 129, 0.08) 100%),
+      linear-gradient(135deg, #0b1220 0%, #0f172a 100%);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .ls-header-accent {
+    /* Avoid the bright mint stripe in dark mode; use a subtle neutral divider. */
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.12) 50%,
+      transparent 100%
+    );
+    opacity: 1;
+  }
+
+  .ls-card-header {
+    background: rgba(255, 255, 255, 0.02);
+    border-bottom-color: rgba(148, 163, 184, 0.12);
+  }
+
+  .ls-footer {
+    border-top-color: rgba(148, 163, 184, 0.12);
+  }
+
+  .ls-status:not(:empty) {
+    background: rgba(16, 185, 129, 0.12);
+    color: #bbf7d0;
+  }
+
+  .ls-checkbox-row:hover {
+    background: rgba(148, 163, 184, 0.06);
+  }
 }
 
 /* ============================================
@@ -383,7 +505,7 @@ body {
   background: var(--ls-primary-500);
   cursor: grab;
   box-shadow: var(--ls-shadow-md), 0 0 0 4px rgba(16, 185, 129, 0.1);
-  border: 3px solid white;
+  border: 3px solid var(--ls-surface-primary);
   transition: box-shadow var(--ls-transition-base);
 }
 
@@ -403,7 +525,7 @@ body {
   background: var(--ls-primary-500);
   cursor: grab;
   box-shadow: var(--ls-shadow-md), 0 0 0 4px rgba(16, 185, 129, 0.1);
-  border: 3px solid white;
+  border: 3px solid var(--ls-surface-primary);
   transition: box-shadow var(--ls-transition-base);
 }
 
@@ -489,7 +611,7 @@ body {
   height: 20px;
   border: 2px solid var(--ls-gray-300);
   border-radius: var(--ls-radius-sm);
-  background: white;
+  background: var(--ls-surface-primary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -726,5 +848,18 @@ body {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* Ensure dark-mode component overrides win the cascade (placed at end). */
+@media (prefers-color-scheme: dark) {
+  .ls-status:not(:empty) {
+    background: rgba(16, 185, 129, 0.12);
+    color: #bbf7d0;
+  }
+
+  .ls-status.error {
+    background: rgba(239, 68, 68, 0.14);
+    color: #fecaca;
   }
 }
