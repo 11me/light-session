@@ -99,21 +99,33 @@
   :root {
     color-scheme: dark;
 
-    /* Dark surfaces (keep brand greens as-is) */
-    --ls-surface-primary: #0f172a;
-    --ls-surface-secondary: #020617;
+    /*
+     * Dark surfaces:
+     * - Keep it mostly neutral (less "navy") so brand green reads premium.
+     * - Use a slightly lighter card surface for depth.
+     */
+    --ls-gray-50: #070a13;  /* app background */
+    --ls-gray-100: #0b1220; /* content background */
+    --ls-gray-200: #111a2e; /* tracks / subtle fills */
+    --ls-gray-300: #233252; /* borders */
 
-    /* Neutral scale remap for dark UI (matches usage patterns in this file) */
-    --ls-gray-50: #020617;
-    --ls-gray-100: #0f172a;
-    --ls-gray-200: #1e293b;
-    --ls-gray-300: #334155;
-    --ls-gray-400: #475569;
-    --ls-gray-500: #64748b;
-    --ls-gray-600: #94a3b8;
-    --ls-gray-700: #cbd5e1;
-    --ls-gray-800: #e2e8f0;
-    --ls-gray-900: #f1f5f9;
+    /* Text ladder (raise contrast vs the first pass) */
+    --ls-gray-400: #64748b; /* tertiary */
+    --ls-gray-500: #94a3b8; /* secondary */
+    --ls-gray-600: #cbd5e1; /* titles */
+    --ls-gray-700: #e2e8f0; /* primary */
+    --ls-gray-800: #f1f5f9;
+    --ls-gray-900: #ffffff;
+
+    --ls-surface-primary: #0f172a; /* cards / main surface */
+    --ls-surface-secondary: #0b1220;
+
+    /* Dark-appropriate elevation (combine shadow + hairline border) */
+    --ls-shadow-xs: 0 1px 0 rgba(255, 255, 255, 0.03);
+    --ls-shadow-sm: 0 8px 20px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.06);
+    --ls-shadow-md: 0 14px 34px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.06);
+    --ls-shadow-lg: 0 22px 50px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.06);
+    --ls-shadow-glow: 0 0 0 3px rgba(16, 185, 129, 0.22);
 
     /* Semantic backgrounds tuned for dark surfaces */
     --ls-warning-bg: rgba(245, 158, 11, 0.14);
@@ -131,23 +143,52 @@
     color: var(--ls-gray-700);
   }
 
-  /* Shadows don't read well on dark; use subtle borders instead */
+  /* Atmosphere: subtle ambient gradients for a less "flat" dark UI */
+  .ls-popup {
+    background:
+      radial-gradient(900px circle at 10% 0%, rgba(16, 185, 129, 0.16), transparent 40%),
+      radial-gradient(700px circle at 95% 10%, rgba(236, 72, 153, 0.10), transparent 44%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 40%),
+      var(--ls-gray-50);
+  }
+
+  .ls-main {
+    /* Let the ambient popup background show through */
+    background: transparent;
+  }
+
+  /* Give cards depth on dark without looking "glossy" */
   .ls-card {
     border: 1px solid rgba(148, 163, 184, 0.12);
-    box-shadow: none;
+    box-shadow: var(--ls-shadow-sm);
+    backdrop-filter: blur(10px);
+    background: rgba(15, 23, 42, 0.72);
+  }
+
+  /* Tone down the header in dark mode (less bright, more refined) */
+  .ls-header {
+    background:
+      linear-gradient(135deg, rgba(16, 185, 129, 0.24) 0%, rgba(16, 185, 129, 0.12) 100%),
+      linear-gradient(135deg, #0b1220 0%, #0f172a 100%);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .ls-header-accent {
+    opacity: 0.35;
   }
 
   .ls-card-header {
-    border-bottom-color: rgba(148, 163, 184, 0.1);
+    background: rgba(255, 255, 255, 0.02);
+    border-bottom-color: rgba(148, 163, 184, 0.12);
   }
 
   .ls-footer {
-    border-top-color: rgba(148, 163, 184, 0.1);
+    border-top-color: rgba(148, 163, 184, 0.12);
   }
 
   .ls-status:not(:empty) {
     background: rgba(16, 185, 129, 0.12);
-    color: var(--ls-primary-200);
+    color: #bbf7d0;
   }
 
   .ls-checkbox-row:hover {
