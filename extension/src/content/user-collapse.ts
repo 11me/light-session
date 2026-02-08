@@ -113,11 +113,15 @@ function safeIdFragment(input: string): string {
 
 function findLca(elements: Element[]): Element | null {
   if (elements.length === 0) return null;
-  let current: Element | null = elements[0];
+  // noUncheckedIndexedAccess: elements[0] is Element | undefined
+  const first = elements[0];
+  if (!first) return null;
+  let current: Element | null = first;
   while (current) {
     let ok = true;
-    for (let i = 1; i < elements.length; i++) {
-      if (!current.contains(elements[i])) {
+    // Avoid indexed access to keep types tight under noUncheckedIndexedAccess.
+    for (const el of elements.slice(1)) {
+      if (!current.contains(el)) {
         ok = false;
         break;
       }
@@ -315,7 +319,9 @@ export function installUserCollapse(): UserCollapseController {
       // Process only addedNodes.
       for (const m of mutations) {
         if (m.type !== 'childList') continue;
-        for (const n of m.addedNodes) {
+        // Avoid for..of over NodeList (requires DOM iterable lib typings).
+        for (let i = 0; i < m.addedNodes.length; i++) {
+          const n = m.addedNodes[i];
           const roots = collectUserRootsFromAddedNode(n);
           for (const r of roots) pendingRoots.add(r);
         }
