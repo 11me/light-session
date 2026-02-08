@@ -99,6 +99,12 @@
   :root {
     color-scheme: dark;
 
+    /* Brand green: a bit darker/less neon in dark mode */
+    --ls-primary-400: #2fbf8f;
+    --ls-primary-500: #059669;
+    --ls-primary-600: #047857;
+    --ls-primary-700: #065f46;
+
     /*
      * Dark surfaces:
      * - Keep it mostly neutral (less "navy") so brand green reads premium.
@@ -125,7 +131,7 @@
     --ls-shadow-sm: 0 8px 20px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.06);
     --ls-shadow-md: 0 14px 34px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.06);
     --ls-shadow-lg: 0 22px 50px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.06);
-    --ls-shadow-glow: 0 0 0 3px rgba(16, 185, 129, 0.22);
+    --ls-shadow-glow: 0 0 0 3px rgba(16, 185, 129, 0.18);
 
     /* Semantic backgrounds tuned for dark surfaces */
     --ls-warning-bg: rgba(245, 158, 11, 0.14);
@@ -146,7 +152,7 @@
   /* Atmosphere: subtle ambient gradients for a less "flat" dark UI */
   .ls-popup {
     background:
-      radial-gradient(900px circle at 10% 0%, rgba(16, 185, 129, 0.16), transparent 40%),
+      radial-gradient(900px circle at 10% 0%, rgba(16, 185, 129, 0.12), transparent 40%),
       radial-gradient(700px circle at 95% 10%, rgba(236, 72, 153, 0.10), transparent 44%),
       linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 40%),
       var(--ls-gray-50);
@@ -168,7 +174,7 @@
   /* Tone down the header in dark mode (less bright, more refined) */
   .ls-header {
     background:
-      linear-gradient(135deg, rgba(16, 185, 129, 0.24) 0%, rgba(16, 185, 129, 0.12) 100%),
+      linear-gradient(135deg, rgba(16, 185, 129, 0.18) 0%, rgba(16, 185, 129, 0.08) 100%),
       linear-gradient(135deg, #0b1220 0%, #0f172a 100%);
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   }
