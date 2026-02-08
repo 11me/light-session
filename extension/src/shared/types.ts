@@ -12,6 +12,7 @@ export interface LsSettings {
   enabled: boolean; // Toggle trimming on/off
   keep: number; // Message retention limit (1-100)
   showStatusBar: boolean; // Show in-page status bar with trimming stats
+  collapseLongUserMessages: boolean; // Collapse long user messages in UI (presentation-only)
   debug: boolean; // Enable debug logging
   ultraLean: boolean; // Enable aggressive performance optimizations (adds .ls-ultra-lean class)
 }

@@ -47,6 +47,7 @@ describe('popup settings loading', () => {
       enabled: true,
       keep: 15,
       showStatusBar: true,
+      collapseLongUserMessages: true,
       debug: false,
       ultraLean: false,
       version: 1,

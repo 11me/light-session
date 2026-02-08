@@ -34,6 +34,7 @@ let keepSlider: HTMLInputElement;
 let keepValue: HTMLElement;
 let sliderTrackFill: HTMLElement;
 let showStatusBarCheckbox: HTMLInputElement | null;
+let collapseLongUserMessagesCheckbox: HTMLInputElement | null;
 let debugCheckbox: HTMLInputElement | null;
 let debugGroup: HTMLElement | null;
 let statusElement: HTMLElement;
@@ -163,6 +164,9 @@ async function initialize(): Promise<void> {
 
   // Get optional UI elements (may not exist in all configurations)
   showStatusBarCheckbox = getOptionalElement<HTMLInputElement>('showStatusBarCheckbox');
+  collapseLongUserMessagesCheckbox = getOptionalElement<HTMLInputElement>(
+    'collapseLongUserMessagesCheckbox'
+  );
   debugCheckbox = getOptionalElement<HTMLInputElement>('debugCheckbox');
   debugGroup = getOptionalElement<HTMLElement>('debugGroup');
   retentionCard = getOptionalElement<HTMLElement>('retentionCard');
@@ -201,6 +205,9 @@ async function initialize(): Promise<void> {
   if (showStatusBarCheckbox) {
     showStatusBarCheckbox.addEventListener('change', handleShowStatusBarToggle);
   }
+  if (collapseLongUserMessagesCheckbox) {
+    collapseLongUserMessagesCheckbox.addEventListener('change', handleCollapseLongUserMessagesToggle);
+  }
   if (debugCheckbox) {
     debugCheckbox.addEventListener('change', handleDebugToggle);
   }
@@ -227,6 +234,9 @@ async function loadSettings(): Promise<void> {
 
     if (showStatusBarCheckbox) {
       showStatusBarCheckbox.checked = settings.showStatusBar;
+    }
+    if (collapseLongUserMessagesCheckbox) {
+      collapseLongUserMessagesCheckbox.checked = settings.collapseLongUserMessages;
     }
     if (debugCheckbox) {
       debugCheckbox.checked = settings.debug;
@@ -308,6 +318,15 @@ async function handleKeepSliderChange(): Promise<void> {
 function handleShowStatusBarToggle(): void {
   if (showStatusBarCheckbox) {
     void updateSettings({ showStatusBar: showStatusBarCheckbox.checked });
+  }
+}
+
+/**
+ * Handle collapse long user messages toggle
+ */
+function handleCollapseLongUserMessagesToggle(): void {
+  if (collapseLongUserMessagesCheckbox) {
+    void updateSettings({ collapseLongUserMessages: collapseLongUserMessagesCheckbox.checked });
   }
 }
 

@@ -30,6 +30,8 @@ export function validateSettings(input: Partial<LsSettings>): LsSettings {
       Math.min(VALIDATION.MAX_KEEP, input.keep ?? DEFAULT_SETTINGS.keep)
     ),
     showStatusBar: input.showStatusBar ?? DEFAULT_SETTINGS.showStatusBar,
+    collapseLongUserMessages:
+      input.collapseLongUserMessages ?? DEFAULT_SETTINGS.collapseLongUserMessages,
     debug: input.debug ?? DEFAULT_SETTINGS.debug,
     ultraLean: input.ultraLean ?? DEFAULT_SETTINGS.ultraLean,
   };

@@ -66,6 +66,10 @@ describe('DEFAULT_SETTINGS', () => {
     expect(typeof DEFAULT_SETTINGS.showStatusBar).toBe('boolean');
   });
 
+  it('collapseLongUserMessages is a boolean', () => {
+    expect(typeof DEFAULT_SETTINGS.collapseLongUserMessages).toBe('boolean');
+  });
+
   it('debug is a boolean', () => {
     expect(typeof DEFAULT_SETTINGS.debug).toBe('boolean');
   });
