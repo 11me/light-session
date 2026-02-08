@@ -82,20 +82,29 @@ describe('isConversationRequest logic', () => {
   // Testing the logic that would be in isConversationRequest
   const isConversationRequest = (method: string, pathname: string): boolean => {
     if (method !== 'GET') return false;
-    if (!pathname.startsWith('/backend-api/')) return false;
-    return true;
+    return /^\/backend-api\/(conversation|shared_conversation)\/[^/]+\/?$/.test(pathname);
   };
 
-  it('returns true for GET /backend-api/ requests', () => {
+  it('returns true only for conversation endpoints', () => {
     expect(isConversationRequest('GET', '/backend-api/conversation/123')).toBe(true);
-    expect(isConversationRequest('GET', '/backend-api/conversation')).toBe(true);
-    expect(isConversationRequest('GET', '/backend-api/')).toBe(true);
+    expect(isConversationRequest('GET', '/backend-api/conversation/123/')).toBe(true);
+    expect(isConversationRequest('GET', '/backend-api/shared_conversation/abc-xyz')).toBe(true);
   });
 
   it('returns false for non-GET methods', () => {
     expect(isConversationRequest('POST', '/backend-api/conversation')).toBe(false);
     expect(isConversationRequest('PUT', '/backend-api/conversation')).toBe(false);
     expect(isConversationRequest('DELETE', '/backend-api/conversation')).toBe(false);
+  });
+
+  it('returns false for non-conversation backend-api paths', () => {
+    expect(isConversationRequest('GET', '/backend-api/')).toBe(false);
+    expect(isConversationRequest('GET', '/backend-api/conversation')).toBe(false);
+    expect(isConversationRequest('GET', '/backend-api/me')).toBe(false);
+    expect(isConversationRequest('GET', '/backend-api/settings/user')).toBe(false);
+    expect(isConversationRequest('GET', '/backend-api/models')).toBe(false);
+    expect(isConversationRequest('GET', '/backend-api/conversation/123/stream_status')).toBe(false);
+    expect(isConversationRequest('GET', '/backend-api/conversation/123/textdocs')).toBe(false);
   });
 
   it('returns false for non-backend-api paths', () => {

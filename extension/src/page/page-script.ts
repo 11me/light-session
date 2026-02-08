@@ -186,12 +186,19 @@ function isConversationRequest(method: string, url: URL): boolean {
     return false;
   }
 
-  // Only /backend-api/ endpoints
-  if (!url.pathname.startsWith('/backend-api/')) {
-    return false;
-  }
-
-  return true;
+  // Only endpoints that return the conversation tree we can trim.
+  // ChatGPT performs many GET /backend-api/* requests on load (/me, /models, /settings, etc.).
+  // Intercepting those adds unnecessary overhead (clone/json) and config gating delay.
+  //
+  // Allowed:
+  // - /backend-api/conversation/<id>
+  // - /backend-api/shared_conversation/<id> (share links)
+  //
+  // Explicitly excluded by pattern (extra path segments):
+  // - /backend-api/conversation/<id>/stream_status
+  // - /backend-api/conversation/<id>/textdocs
+  const path = url.pathname;
+  return /^\/backend-api\/(conversation|shared_conversation)\/[^/]+\/?$/.test(path);
 }
 
 /**
