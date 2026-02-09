@@ -243,7 +243,7 @@ function setupNavigationDetection(): void {
     // Coalesce rapid history events into a single tick.
     if (navScheduled) return;
     navScheduled = true;
-    Promise.resolve().then(() => {
+    queueMicrotask(() => {
       navScheduled = false;
 
       // Keep the key updated even if we decide not to run side effects.
@@ -271,10 +271,9 @@ function setupNavigationDetection(): void {
   // Patch history methods for SPA navigation detection
   // Guard against double patching (e.g. extension reload / unexpected reinjection).
   const PATCH_FLAG = '__lightsession_patched_history__';
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  if ((history as any)[PATCH_FLAG]) return;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (history as any)[PATCH_FLAG] = true;
+  const patchScope = window as unknown as Record<string, unknown>;
+  if (patchScope[PATCH_FLAG] === true) return;
+  patchScope[PATCH_FLAG] = true;
 
   const originalPushState = history.pushState.bind(history);
   const originalReplaceState = history.replaceState.bind(history);
