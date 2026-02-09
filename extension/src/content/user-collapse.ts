@@ -266,12 +266,17 @@ function processUserMessageRoot(root: HTMLElement): void {
 function collectUserRootsFromAddedNode(node: unknown): HTMLElement[] {
   if (!(node instanceof HTMLElement)) return [];
 
-  const out: HTMLElement[] = [];
-  if (node.matches(USER_ROOT_SELECTOR)) out.push(node);
+  // Avoid duplicate work; pendingRoots is a Set but array creation can still be expensive on large mutation batches.
+  if (node.matches(USER_ROOT_SELECTOR)) return [node];
+
+  const out = new Set<HTMLElement>();
+
   const closest = node.closest<HTMLElement>(USER_ROOT_SELECTOR);
-  if (closest) out.push(closest);
-  out.push(...Array.from(node.querySelectorAll<HTMLElement>(USER_ROOT_SELECTOR)));
-  return out;
+  if (closest) out.add(closest);
+
+  for (const r of Array.from(node.querySelectorAll<HTMLElement>(USER_ROOT_SELECTOR))) out.add(r);
+
+  return Array.from(out);
 }
 
 export interface UserCollapseController {
@@ -284,6 +289,9 @@ export function installUserCollapse(): UserCollapseController {
   let observer: MutationObserver | null = null;
   let container: HTMLElement | null = null;
   let scroller: HTMLElement | null = null;
+  let mainWaitObserver: MutationObserver | null = null;
+  let reattachObserver: MutationObserver | null = null;
+  let reattachScheduled = false;
   const pendingRoots = new Set<HTMLElement>();
   let rafScheduled = false;
   let onDocClick: ((ev: MouseEvent) => void) | null = null;
@@ -308,28 +316,63 @@ export function installUserCollapse(): UserCollapseController {
     });
   };
 
-  const attachObserver = (): void => {
-    const main = getMain();
-    if (!main) return;
+  const scheduleEnsureAttached = (): void => {
+    if (reattachScheduled) return;
+    reattachScheduled = true;
+    requestAnimationFrame(() => {
+      reattachScheduled = false;
+      if (!enabled) return;
+      try {
+        ensureAttached();
+      } catch (e) {
+        logWarn('User collapse failed to re-attach:', e);
+      }
+    });
+  };
 
-    container = deriveMessageListContainer(main);
+  const attachObserverTo = (nextContainer: HTMLElement): void => {
+    observer?.disconnect();
+    observer = null;
+
+    container = nextContainer;
     scroller = deriveScrollContainer(container);
 
     observer = new MutationObserver((mutations: MutationRecord[]) => {
-      // Process only addedNodes.
+      // Process added nodes and attribute changes (SPA can recycle DOM nodes across chats).
       for (const m of mutations) {
-        if (m.type !== 'childList') continue;
-        // Avoid for..of over NodeList (requires DOM iterable lib typings).
-        for (let i = 0; i < m.addedNodes.length; i++) {
-          const n = m.addedNodes[i];
-          const roots = collectUserRootsFromAddedNode(n);
-          for (const r of roots) pendingRoots.add(r);
+        if (m.type === 'childList') {
+          // Avoid for..of over NodeList (requires DOM iterable lib typings).
+          for (let i = 0; i < m.addedNodes.length; i++) {
+            const n = m.addedNodes[i];
+            const roots = collectUserRootsFromAddedNode(n);
+            for (const r of roots) pendingRoots.add(r);
+          }
+          continue;
+        }
+
+        if (m.type === 'attributes') {
+          if (m.target instanceof HTMLElement) {
+            // Attribute changes are usually on the root node, but can also happen on wrappers.
+            // Include descendants to handle node recycling across chats.
+            if (m.target.matches(USER_ROOT_SELECTOR)) {
+              pendingRoots.add(m.target);
+            } else {
+              const roots = collectUserRootsFromAddedNode(m.target);
+              for (const r of roots) pendingRoots.add(r);
+            }
+          }
+          continue;
         }
       }
       if (pendingRoots.size > 0) scheduleProcess();
     });
 
-    observer.observe(container, { childList: true, subtree: true });
+    observer.observe(container, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['data-message-author-role', 'data-message-id'],
+    });
 
     // Initial scan.
     const initial = Array.from(container.querySelectorAll<HTMLElement>(USER_ROOT_SELECTOR));
@@ -337,39 +380,89 @@ export function installUserCollapse(): UserCollapseController {
     if (pendingRoots.size > 0) scheduleProcess();
   };
 
+  const ensureAttached = (): void => {
+    const main = getMain();
+    if (!main) {
+      // ChatGPT is a SPA; when enabled early we may not yet have <main>.
+      // Attach a short-lived observer to wait for it, then bind to the current container.
+      if (!mainWaitObserver) {
+        mainWaitObserver = new MutationObserver(() => {
+          if (!enabled) return;
+          if (getMain()) {
+            mainWaitObserver?.disconnect();
+            mainWaitObserver = null;
+            scheduleEnsureAttached();
+          }
+        });
+        mainWaitObserver.observe(document.documentElement, { childList: true, subtree: true });
+      }
+      return;
+    }
+
+    if (mainWaitObserver) {
+      mainWaitObserver.disconnect();
+      mainWaitObserver = null;
+    }
+
+    const nextContainer = deriveMessageListContainer(main);
+    const nextScroller = deriveScrollContainer(nextContainer);
+
+    // Common case: still attached to the current container; just keep scroller fresh.
+    if (container === nextContainer && observer && container.isConnected) {
+      scroller = nextScroller;
+      return;
+    }
+
+    attachObserverTo(nextContainer);
+  };
+
   const enableFn = (): void => {
-    if (enabled) return;
     if (!isTargetHost()) return;
 
+    // Allow repeated calls (e.g. after SPA navigation) to re-attach to the active chat container.
     enabled = true;
     ensureStyles();
 
-    // Single delegated click handler for toggles.
-    onDocClick = (ev: MouseEvent): void => {
-      if (!scroller) return;
-      const target = ev.target;
-      if (!(target instanceof Element)) return;
-      const btn = target.closest<HTMLButtonElement>('button.ls-uc-toggle');
-      if (!btn) return;
-      const bubble = btn.closest<HTMLElement>('.ls-uc-bubble');
-      if (!bubble) return;
-
-      const wasPinned = isPinnedToBottom(scroller);
-      const prevScrollTop = scroller.scrollTop;
-      const prevScrollHeight = scroller.scrollHeight;
-
-      const expanded = bubble.getAttribute(STATE_ATTR) === 'expanded';
-      bubble.setAttribute(STATE_ATTR, expanded ? 'collapsed' : 'expanded');
-      updateButtonUi(btn, !expanded);
-
-      requestAnimationFrame(() => {
-        preserveScrollAfterHeightChange(scroller!, prevScrollTop, prevScrollHeight, wasPinned);
+    // Watch for React replacing the main/container nodes after navigation.
+    // If our current container is detached, proactively re-attach.
+    if (!reattachObserver) {
+      reattachObserver = new MutationObserver(() => {
+        if (!enabled) return;
+        if (container && !container.isConnected) {
+          scheduleEnsureAttached();
+        }
       });
-    };
-    document.addEventListener('click', onDocClick, true);
+      reattachObserver.observe(document.documentElement, { childList: true, subtree: true });
+    }
+
+    // Single delegated click handler for toggles.
+    if (!onDocClick) {
+      onDocClick = (ev: MouseEvent): void => {
+        if (!scroller) return;
+        const target = ev.target;
+        if (!(target instanceof Element)) return;
+        const btn = target.closest<HTMLButtonElement>('button.ls-uc-toggle');
+        if (!btn) return;
+        const bubble = btn.closest<HTMLElement>('.ls-uc-bubble');
+        if (!bubble) return;
+
+        const wasPinned = isPinnedToBottom(scroller);
+        const prevScrollTop = scroller.scrollTop;
+        const prevScrollHeight = scroller.scrollHeight;
+
+        const expanded = bubble.getAttribute(STATE_ATTR) === 'expanded';
+        bubble.setAttribute(STATE_ATTR, expanded ? 'collapsed' : 'expanded');
+        updateButtonUi(btn, !expanded);
+
+        requestAnimationFrame(() => {
+          preserveScrollAfterHeightChange(scroller!, prevScrollTop, prevScrollHeight, wasPinned);
+        });
+      };
+      document.addEventListener('click', onDocClick, true);
+    }
 
     try {
-      attachObserver();
+      ensureAttached();
     } catch (e) {
       logWarn('User collapse failed to attach:', e);
     }
@@ -379,10 +472,21 @@ export function installUserCollapse(): UserCollapseController {
     enabled = false;
     rafScheduled = false;
     pendingRoots.clear();
+    reattachScheduled = false;
 
     if (onDocClick) {
       document.removeEventListener('click', onDocClick, true);
       onDocClick = null;
+    }
+
+    if (mainWaitObserver) {
+      mainWaitObserver.disconnect();
+      mainWaitObserver = null;
+    }
+
+    if (reattachObserver) {
+      reattachObserver.disconnect();
+      reattachObserver = null;
     }
 
     if (observer) {
