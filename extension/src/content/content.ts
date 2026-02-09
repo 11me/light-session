@@ -235,40 +235,61 @@ function handleStorageChange(
  * Resets accumulated trim count on chat changes.
  */
 function setupNavigationDetection(): void {
-  let lastPath = location.pathname;
+  // Use full href as the navigation key. ChatGPT can navigate without changing pathname.
+  let lastUrl = location.href;
+  let navScheduled = false;
+
+  const scheduleNavSideEffects = (source: 'popstate' | 'pushState' | 'replaceState'): void => {
+    // Coalesce rapid history events into a single tick.
+    if (navScheduled) return;
+    navScheduled = true;
+    queueMicrotask(() => {
+      navScheduled = false;
+
+      // Keep the key updated even if we decide not to run side effects.
+      lastUrl = location.href;
+
+      logDebug(`${source} navigation:`, lastUrl);
+      resetAccumulatedTrimmed();
+      refreshStatusBar();
+
+      // Re-bind DOM observers for per-chat containers (SPA navigation can replace the message list DOM).
+      // Make the settings intent explicit; userCollapse being non-null is an implementation detail.
+      if (currentSettings?.enabled && currentSettings.collapseLongUserMessages) {
+        userCollapse?.enable();
+      }
+    });
+  };
 
   // Listen for popstate events
   window.addEventListener('popstate', () => {
-    if (location.pathname !== lastPath) {
-      lastPath = location.pathname;
-      logDebug('Popstate navigation:', lastPath);
-      resetAccumulatedTrimmed();
-      refreshStatusBar();
+    if (location.href !== lastUrl) {
+      scheduleNavSideEffects('popstate');
     }
   });
 
   // Patch history methods for SPA navigation detection
+  // Guard against double patching (e.g. extension reload / unexpected reinjection).
+  const PATCH_FLAG = '__lightsession_patched_history__';
+  const patchScope = window as unknown as Record<string, unknown>;
+  if (patchScope[PATCH_FLAG] === true) return;
+  patchScope[PATCH_FLAG] = true;
+
   const originalPushState = history.pushState.bind(history);
   const originalReplaceState = history.replaceState.bind(history);
 
   history.pushState = function (...args: Parameters<typeof history.pushState>) {
     const result = originalPushState(...args);
-    if (location.pathname !== lastPath) {
-      lastPath = location.pathname;
-      logDebug('PushState navigation:', lastPath);
-      resetAccumulatedTrimmed();
-      refreshStatusBar();
+    if (location.href !== lastUrl) {
+      scheduleNavSideEffects('pushState');
     }
     return result;
   };
 
   history.replaceState = function (...args: Parameters<typeof history.replaceState>) {
     const result = originalReplaceState(...args);
-    if (location.pathname !== lastPath) {
-      lastPath = location.pathname;
-      logDebug('ReplaceState navigation:', lastPath);
-      resetAccumulatedTrimmed();
-      refreshStatusBar();
+    if (location.href !== lastUrl) {
+      scheduleNavSideEffects('replaceState');
     }
     return result;
   };

@@ -9,6 +9,7 @@ import { installUserCollapse } from '../../extension/src/content/user-collapse';
 type MockMutation = {
   type: string;
   addedNodes: Node[];
+  target?: Node;
 };
 
 class MockMutationObserver {
@@ -66,10 +67,22 @@ function mockLayout(el: HTMLElement, opts: { scrollHeight?: number; clientHeight
 
 describe('user-collapse', () => {
   const originalMO = globalThis.MutationObserver;
+  let lastCtrl: { teardown: () => void } | null = null;
+
+  function getObserverForContainer(container: HTMLElement): MockMutationObserver {
+    const mo = MockMutationObserver.instances.find((x) =>
+      x.observed.some((o) => o.target === container)
+    );
+    if (!mo) {
+      throw new Error('Expected a MutationObserver to be attached to the container');
+    }
+    return mo;
+  }
 
   beforeEach(() => {
     document.body.innerHTML = '';
     MockMutationObserver.instances = [];
+    lastCtrl = null;
 
     // Ensure module considers this a supported host.
     window.location.href = 'https://chatgpt.com/';
@@ -84,6 +97,8 @@ describe('user-collapse', () => {
   });
 
   afterEach(() => {
+    lastCtrl?.teardown();
+    lastCtrl = null;
     globalThis.MutationObserver = originalMO;
     vi.restoreAllMocks();
   });
@@ -109,6 +124,7 @@ describe('user-collapse', () => {
 
     const ctrl = installUserCollapse();
     ctrl.enable();
+    lastCtrl = ctrl;
 
     const bubble = document.querySelector('.user-message-bubble-color') as HTMLElement;
     const btn = bubble.querySelector('button.ls-uc-toggle') as HTMLButtonElement;
@@ -141,6 +157,7 @@ describe('user-collapse', () => {
 
     const ctrl = installUserCollapse();
     ctrl.enable();
+    lastCtrl = ctrl;
 
     const bubble = document.querySelector('.user-message-bubble-color') as HTMLElement;
     expect(bubble.querySelector('button.ls-uc-toggle')).toBeNull();
@@ -168,6 +185,7 @@ describe('user-collapse', () => {
 
     const ctrl = installUserCollapse();
     ctrl.enable();
+    lastCtrl = ctrl;
 
     const bubble = document.querySelector('.user-message-bubble-color') as HTMLElement;
     const btn = bubble.querySelector('button.ls-uc-toggle') as HTMLButtonElement;
@@ -202,11 +220,13 @@ describe('user-collapse', () => {
 
     const ctrl = installUserCollapse();
     ctrl.enable();
+    lastCtrl = ctrl;
 
     const bubble = document.querySelector('.user-message-bubble-color') as HTMLElement;
     expect(bubble.querySelectorAll('button.ls-uc-toggle').length).toBe(1);
 
-    const mo = MockMutationObserver.instances[0];
+    const turns = document.getElementById('turns') as HTMLElement;
+    const mo = getObserverForContainer(turns);
     const root = document.getElementById('root') as HTMLElement;
     mo.trigger([{ type: 'childList', addedNodes: [root] }]);
 
@@ -234,15 +254,56 @@ describe('user-collapse', () => {
 
     const ctrl = installUserCollapse();
     ctrl.enable();
+    lastCtrl = ctrl;
 
     const bubble = document.querySelector('.user-message-bubble-color') as HTMLElement;
     expect(bubble.querySelector('button.ls-uc-toggle')).not.toBeNull();
 
-    const mo = MockMutationObserver.instances[0];
+    const turns = document.querySelector('[data-testid="conversation-turns"]') as HTMLElement;
+    const mo = getObserverForContainer(turns);
     ctrl.teardown();
+    lastCtrl = null;
 
     expect(mo.disconnected).toBe(true);
     expect(bubble.querySelector('button.ls-uc-toggle')).toBeNull();
     expect(document.getElementById('lightsession-user-collapse-styles')).toBeNull();
+  });
+
+  it('processes user roots that become eligible via attribute changes (SPA recycling)', () => {
+    document.body.innerHTML = `
+      <main style="overflow-y:auto">
+        <div data-testid="conversation-turns">
+          <div data-message-author-role="user" id="root">
+            <div class="user-message-bubble-color">
+              <div class="whitespace-pre-wrap">Long</div>
+            </div>
+          </div>
+        </div>
+      </main>
+    `;
+
+    const main = document.querySelector('main') as HTMLElement;
+    mockLayout(main, { scrollHeight: 2000, clientHeight: 800 });
+
+    const text = document.querySelector('.whitespace-pre-wrap') as HTMLElement;
+    mockLayout(text, { scrollHeight: 1200, clientHeight: 120, rectHeight: 1200 });
+
+    const ctrl = installUserCollapse();
+    ctrl.enable();
+    lastCtrl = ctrl;
+
+    const bubble = document.querySelector('.user-message-bubble-color') as HTMLElement;
+    expect(bubble.querySelector('button.ls-uc-toggle')).toBeNull();
+
+    // Simulate SPA updating attributes after initial DOM insertion.
+    const root = document.getElementById('root') as HTMLElement;
+    root.setAttribute('data-message-id', 'm6');
+
+    const turns = document.querySelector('[data-testid="conversation-turns"]') as HTMLElement;
+    const mo = getObserverForContainer(turns);
+    mo.trigger([{ type: 'attributes', addedNodes: [], target: root }]);
+
+    expect(bubble.querySelector('button.ls-uc-toggle')).not.toBeNull();
+    expect(bubble.getAttribute('data-ls-uc-state')).toBe('collapsed');
   });
 });
