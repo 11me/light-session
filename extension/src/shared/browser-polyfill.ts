@@ -4,6 +4,7 @@
  * Cross-browser compatibility layer for WebExtension APIs.
  * - Firefox: uses global `browser` object (Promise-based)
  * - Chrome: uses global `chrome` object (callback-based, but MV3 supports Promises)
+ * - Safari: Web Extensions API (browser/chrome); MV3 from Safari 15.4+
  *
  * Modern Chrome (MV3) supports Promise-based APIs similar to Firefox,
  * so we can use `chrome` directly as a drop-in replacement for `browser`.
