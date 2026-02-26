@@ -231,6 +231,92 @@ describe('user-collapse', () => {
     expect(bubble.getAttribute('data-ls-uc-state')).toBe('expanded');
   });
 
+
+  it('keeps only the latest long assistant message expanded', () => {
+    document.body.innerHTML = `
+      <main style="overflow-y:auto">
+        <div data-testid="conversation-turns">
+          <div data-message-author-role="assistant" data-message-id="a1">
+            <div>
+              <div class="markdown prose" id="a1-text">Long assistant response 1</div>
+            </div>
+          </div>
+          <div data-message-author-role="assistant" data-message-id="a2">
+            <div>
+              <div class="markdown prose" id="a2-text">Long assistant response 2</div>
+            </div>
+          </div>
+        </div>
+      </main>
+    `;
+
+    const main = document.querySelector('main') as HTMLElement;
+    mockLayout(main, { scrollHeight: 2000, clientHeight: 800 });
+
+    const text1 = document.getElementById('a1-text') as HTMLElement;
+    const text2 = document.getElementById('a2-text') as HTMLElement;
+    mockLayout(text1, { scrollHeight: 1200, clientHeight: 120, rectHeight: 1200 });
+    mockLayout(text2, { scrollHeight: 1300, clientHeight: 130, rectHeight: 1300 });
+
+    const ctrl = installUserCollapse();
+    ctrl.enable();
+    lastCtrl = ctrl;
+
+    const bubble1 = text1.parentElement as HTMLElement;
+    const bubble2 = text2.parentElement as HTMLElement;
+
+    expect(bubble1.getAttribute('data-ls-uc-state')).toBe('collapsed');
+    expect(bubble2.getAttribute('data-ls-uc-state')).toBe('expanded');
+  });
+
+  it('collapses previous assistant message when a newer assistant response arrives', () => {
+    document.body.innerHTML = `
+      <main style="overflow-y:auto">
+        <div data-testid="conversation-turns" id="turns">
+          <div data-message-author-role="assistant" data-message-id="a1" id="a1-root">
+            <div>
+              <div class="markdown prose" id="a1-text">Long assistant response 1</div>
+            </div>
+          </div>
+        </div>
+      </main>
+    `;
+
+    const main = document.querySelector('main') as HTMLElement;
+    mockLayout(main, { scrollHeight: 2000, clientHeight: 800 });
+
+    const text1 = document.getElementById('a1-text') as HTMLElement;
+    mockLayout(text1, { scrollHeight: 1200, clientHeight: 120, rectHeight: 1200 });
+
+    const ctrl = installUserCollapse();
+    ctrl.enable();
+    lastCtrl = ctrl;
+
+    const turns = document.getElementById('turns') as HTMLElement;
+    const mo = getObserverForContainer(turns);
+
+    const newRoot = document.createElement('div');
+    newRoot.setAttribute('data-message-author-role', 'assistant');
+    newRoot.setAttribute('data-message-id', 'a2');
+    const wrap = document.createElement('div');
+    const text2 = document.createElement('div');
+    text2.className = 'markdown prose';
+    text2.id = 'a2-text';
+    text2.textContent = 'Long assistant response 2';
+    wrap.appendChild(text2);
+    newRoot.appendChild(wrap);
+    turns.appendChild(newRoot);
+
+    mockLayout(text2, { scrollHeight: 1300, clientHeight: 130, rectHeight: 1300 });
+
+    mo.trigger([{ type: 'childList', addedNodes: [newRoot] }]);
+
+    const bubble1 = text1.parentElement as HTMLElement;
+    const bubble2 = text2.parentElement as HTMLElement;
+    expect(bubble1.getAttribute('data-ls-uc-state')).toBe('collapsed');
+    expect(bubble2.getAttribute('data-ls-uc-state')).toBe('expanded');
+  });
+
   it('does not duplicate toggles when processing the same message again', () => {
     document.body.innerHTML = `
       <main style="overflow-y:auto">
