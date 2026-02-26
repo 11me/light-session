@@ -214,6 +214,23 @@ function applyFadeColor(bubble: HTMLElement, text: HTMLElement): void {
   }
 }
 
+
+function isAssistantRoot(root: HTMLElement): boolean {
+  return root.getAttribute('data-message-author-role') === 'assistant';
+}
+
+function isLatestAssistantRoot(root: HTMLElement): boolean {
+  const allAssistantRoots = Array.from(
+    document.querySelectorAll<HTMLElement>('[data-message-author-role="assistant"][data-message-id]')
+  );
+  if (allAssistantRoots.length === 0) return false;
+  return allAssistantRoots[allAssistantRoots.length - 1] === root;
+}
+
+function shouldStartExpanded(root: HTMLElement): boolean {
+  return isAssistantRoot(root) && isLatestAssistantRoot(root);
+}
+
 function removeCollapseUi(root: HTMLElement, bubble: HTMLElement, text: HTMLElement): void {
   bubble.removeAttribute(STATE_ATTR);
   bubble.classList.remove('ls-uc-bubble');
@@ -235,7 +252,7 @@ function ensureCollapseUi(root: HTMLElement, bubble: HTMLElement, text: HTMLElem
   text.id = textId;
 
   if (!bubble.getAttribute(STATE_ATTR)) {
-    bubble.setAttribute(STATE_ATTR, 'collapsed');
+    bubble.setAttribute(STATE_ATTR, shouldStartExpanded(root) ? 'expanded' : 'collapsed');
   }
 
   const btn = ensureButton(bubble, textId);
@@ -251,6 +268,27 @@ function deriveBubbleContainer(root: HTMLElement, text: HTMLElement): HTMLElemen
   // Assistant turns typically don't use the user bubble class.
   // Use the text container's parent so button positioning is localized to the message content.
   return text.parentElement instanceof HTMLElement ? text.parentElement : root;
+}
+
+
+function normalizeAssistantExpansion(): void {
+  const allAssistantRoots = Array.from(
+    document.querySelectorAll<HTMLElement>('[data-message-author-role="assistant"][data-message-id]')
+  );
+  if (allAssistantRoots.length === 0) return;
+
+  const latestAssistant = allAssistantRoots[allAssistantRoots.length - 1];
+  for (const root of allAssistantRoots) {
+    const text = findTextContainer(root);
+    if (!text) continue;
+    const bubble = deriveBubbleContainer(root, text);
+    const btn = bubble.querySelector<HTMLButtonElement>('button.ls-uc-toggle');
+    if (!btn) continue;
+
+    const expanded = root === latestAssistant;
+    bubble.setAttribute(STATE_ATTR, expanded ? 'expanded' : 'collapsed');
+    updateButtonUi(btn, expanded);
+  }
 }
 
 function processCollapsibleMessageRoot(root: HTMLElement): void {
@@ -317,6 +355,7 @@ export function installUserCollapse(): UserCollapseController {
         processCollapsibleMessageRoot(root);
       }
       pendingRoots.clear();
+      normalizeAssistantExpansion();
 
       if (scroller && wasPinned) {
         // Keep user pinned to bottom if they were pinned before we changed layout.
