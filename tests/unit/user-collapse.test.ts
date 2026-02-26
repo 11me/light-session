@@ -199,6 +199,38 @@ describe('user-collapse', () => {
     expect(bubble.getAttribute('data-ls-uc-state')).toBe('collapsed');
   });
 
+
+  it('starts long assistant messages expanded by default', () => {
+    document.body.innerHTML = `
+      <main style="overflow-y:auto">
+        <div data-testid="conversation-turns">
+          <div data-message-author-role="assistant" data-message-id="a1">
+            <div>
+              <div class="markdown prose">Long assistant response</div>
+            </div>
+          </div>
+        </div>
+      </main>
+    `;
+
+    const main = document.querySelector('main') as HTMLElement;
+    mockLayout(main, { scrollHeight: 2000, clientHeight: 800 });
+
+    const text = document.querySelector('.markdown.prose') as HTMLElement;
+    mockLayout(text, { scrollHeight: 1200, clientHeight: 120, rectHeight: 1200 });
+
+    const ctrl = installUserCollapse();
+    ctrl.enable();
+    lastCtrl = ctrl;
+
+    const bubble = text.parentElement as HTMLElement;
+    const btn = bubble.querySelector('button.ls-uc-toggle') as HTMLButtonElement;
+
+    expect(btn).not.toBeNull();
+    expect(btn.getAttribute('aria-expanded')).toBe('true');
+    expect(bubble.getAttribute('data-ls-uc-state')).toBe('expanded');
+  });
+
   it('does not duplicate toggles when processing the same message again', () => {
     document.body.innerHTML = `
       <main style="overflow-y:auto">
