@@ -52,8 +52,8 @@ function getOrCreateStatusBar(): HTMLElement | null {
 function applyStatusBarStyles(bar: HTMLElement): void {
   Object.assign(bar.style, {
     position: 'fixed',
-    bottom: '50px',
-    right: '24px',
+    bottom: '3.5px',
+    right: '20px',
     zIndex: '10000',
     padding: '4px 10px',
     fontSize: '11px',
