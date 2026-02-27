@@ -53,7 +53,7 @@ function applyStatusBarStyles(bar: HTMLElement): void {
   Object.assign(bar.style, {
     position: 'fixed',
     bottom: '3.5px',
-    right: '20px',
+    right: '24px',
     zIndex: '10000',
     padding: '4px 10px',
     fontSize: '11px',
