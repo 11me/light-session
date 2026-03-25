@@ -328,6 +328,22 @@ async function interceptedFetch(
     const keptAfter = trimmed.visibleKept;
     const removed = Math.max(0, totalBefore - keptAfter);
 
+    // Guard: no visible nodes were trimmed - return original response untouched.
+    // Rewriting the tree when nothing is trimmed would destroy hidden/system/tool/thinking
+    // nodes and alter the tree shape unnecessarily (issue #26).
+    if (trimmed.visibleKept === trimmed.visibleTotal) {
+      log(
+        `No visible trim needed: ${keptAfter}/${totalBefore} nodes (limit: ${cfg.limit})`
+      );
+      dispatchStatus({
+        totalBefore,
+        keptAfter,
+        removed: 0,
+        limit: cfg.limit,
+      });
+      return res;
+    }
+
     log(
       `Trimmed: ${keptAfter}/${totalBefore} nodes (limit: ${cfg.limit}), visible: ${trimmed.visibleKept}/${trimmed.visibleTotal}`
     );

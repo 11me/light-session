@@ -504,6 +504,140 @@ describe('error handling', () => {
   });
 });
 
+describe('fetch interception no-trim path (visibleKept === visibleTotal)', () => {
+  const mockedTrimMapping = vi.mocked(trimMapping);
+
+  beforeEach(() => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    localStorage.clear();
+    delete (window as unknown as { __LS_PROXY_PATCHED__?: boolean }).__LS_PROXY_PATCHED__;
+    delete (window as unknown as { __LS_CONFIG__?: unknown }).__LS_CONFIG__;
+    delete (window as unknown as { __LS_DEBUG__?: boolean }).__LS_DEBUG__;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('returns original response when visibleKept === visibleTotal', async () => {
+    localStorage.setItem('ls_config', JSON.stringify({ enabled: true, limit: 10, debug: false }));
+
+    const conversationData = createConversationData(4);
+    const originalResponse = createMockResponse(conversationData);
+    const nativeFetch = vi.fn(async () => originalResponse);
+
+    (globalThis as unknown as { fetch: typeof fetch }).fetch = nativeFetch;
+
+    // trimMapping returns visibleKept === visibleTotal (no visible nodes to trim)
+    mockedTrimMapping.mockReturnValue({
+      mapping: conversationData.mapping,
+      current_node: 'node-3',
+      root: 'node-0',
+      keptCount: 4,
+      totalCount: 4,
+      visibleKept: 4,
+      visibleTotal: 4,
+    });
+
+    await import('../../extension/src/page/page-script');
+
+    const result = await window.fetch('https://chatgpt.com/backend-api/conversation/123');
+
+    // The original response object is returned unmodified
+    expect(result).toBe(originalResponse);
+  });
+
+  it('dispatches lightsession-status with removed === 0 when visibleKept === visibleTotal', async () => {
+    localStorage.setItem('ls_config', JSON.stringify({ enabled: true, limit: 10, debug: false }));
+
+    const conversationData = createConversationData(4);
+    const nativeFetch = vi.fn(async () => createMockResponse(conversationData));
+
+    (globalThis as unknown as { fetch: typeof fetch }).fetch = nativeFetch;
+
+    mockedTrimMapping.mockReturnValue({
+      mapping: conversationData.mapping,
+      current_node: 'node-3',
+      root: 'node-0',
+      keptCount: 4,
+      totalCount: 4,
+      visibleKept: 4,
+      visibleTotal: 4,
+    });
+
+    const statusEvents: unknown[] = [];
+    window.addEventListener('lightsession-status', ((e: CustomEvent) => {
+      statusEvents.push(e.detail);
+    }) as EventListener);
+
+    await import('../../extension/src/page/page-script');
+    await window.fetch('https://chatgpt.com/backend-api/conversation/123');
+
+    expect(statusEvents.length).toBeGreaterThanOrEqual(1);
+    const last = statusEvents[statusEvents.length - 1] as {
+      totalBefore: number;
+      keptAfter: number;
+      removed: number;
+    };
+    expect(last.totalBefore).toBe(4);
+    expect(last.keptAfter).toBe(4);
+    expect(last.removed).toBe(0);
+  });
+
+  it('returns original response when visibleKept === visibleTotal (exact limit: 5 of 5)', async () => {
+    localStorage.setItem('ls_config', JSON.stringify({ enabled: true, limit: 5, debug: false }));
+
+    const conversationData = createConversationData(5);
+    const originalResponse = createMockResponse(conversationData);
+    const nativeFetch = vi.fn(async () => originalResponse);
+
+    (globalThis as unknown as { fetch: typeof fetch }).fetch = nativeFetch;
+
+    mockedTrimMapping.mockReturnValue({
+      mapping: conversationData.mapping,
+      current_node: 'node-4',
+      root: 'node-0',
+      keptCount: 5,
+      totalCount: 5,
+      visibleKept: 5,
+      visibleTotal: 5,
+    });
+
+    await import('../../extension/src/page/page-script');
+
+    const result = await window.fetch('https://chatgpt.com/backend-api/conversation/123');
+
+    expect(result).toBe(originalResponse);
+  });
+
+  it('returns original response when visibleKept === visibleTotal (single message: 1 of 1)', async () => {
+    localStorage.setItem('ls_config', JSON.stringify({ enabled: true, limit: 10, debug: false }));
+
+    const conversationData = createConversationData(1);
+    const originalResponse = createMockResponse(conversationData);
+    const nativeFetch = vi.fn(async () => originalResponse);
+
+    (globalThis as unknown as { fetch: typeof fetch }).fetch = nativeFetch;
+
+    mockedTrimMapping.mockReturnValue({
+      mapping: conversationData.mapping,
+      current_node: 'node-0',
+      root: 'node-0',
+      keptCount: 1,
+      totalCount: 1,
+      visibleKept: 1,
+      visibleTotal: 1,
+    });
+
+    await import('../../extension/src/page/page-script');
+
+    const result = await window.fetch('https://chatgpt.com/backend-api/conversation/123');
+
+    expect(result).toBe(originalResponse);
+  });
+});
+
 // ============================================================================
 // Config Gating Behavior (runtime fetch interception)
 // ============================================================================

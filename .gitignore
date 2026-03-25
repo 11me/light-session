@@ -51,3 +51,4 @@ extension/.dev
 *.temp
 .serena/
 extension/manifest.json
+.signum/
