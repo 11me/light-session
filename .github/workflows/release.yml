@@ -103,6 +103,7 @@ jobs:
             eslint.config.js \
             build.cjs \
             README.md \
+            AMO-SOURCE-README.md \
             LICENSE \
             .gitignore \
             .prettierrc \
@@ -158,6 +159,22 @@ jobs:
         with:
           addon-id: ${{ secrets.FIREFOX_ADDON_ID }}
           addon-path: light-session-${{ steps.version.outputs.VERSION }}-firefox.zip
+          source-path: light-session-${{ steps.version.outputs.VERSION }}-source.zip
+          approval-note: |
+            Source archive for this exact version is attached.
+
+            Build environment:
+            - Node.js 24.x (see .node-version)
+            - npm ci (uses package-lock.json)
+
+            Build steps:
+            1. npm ci
+            2. npm run build:prod:firefox
+
+            The submitted zip was created with:
+            cd extension && zip -r ../light-session-VERSION-firefox.zip manifest.json dist/ popup/ icons/ -x "*.map"
+
+            See AMO-SOURCE-README.md in the source archive for details.
           auth-api-issuer: ${{ secrets.FIREFOX_API_ISSUER }}
           auth-api-secret: ${{ secrets.FIREFOX_API_SECRET }}
           release-note: "See release notes at https://github.com/11me/light-session/releases/tag/v${{ steps.version.outputs.VERSION }}"
