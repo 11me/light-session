@@ -163,7 +163,7 @@ LightSession uses a **Fetch Proxy** architecture:
 1. **Injection** – at `document_start`, injects a script into the page context before ChatGPT loads.
 2. **Interception** – patches `window.fetch` to intercept `/backend-api/` JSON responses.
 3. **Trimming** – parses the conversation mapping, counts messages (role transitions), keeps the last N messages.
-4. **Response** – if trimming is needed, returns a modified Response with trimmed JSON; otherwise returns the original Response untouched to preserve hidden nodes and tree structure.
+4. **Response** – if there are more messages than the limit, returns a modified Response with trimmed JSON; otherwise passes the original response through unchanged.
 
 **Message counting**: A "message" is a contiguous sequence of nodes from the same role. Consecutive assistant nodes (e.g., from Extended Thinking) are aggregated as ONE message.
 
