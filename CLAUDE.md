@@ -46,7 +46,7 @@ content.ts → dispatches settings via CustomEvent → receives status updates
 3. Builds path from current_node to root via parent links
 4. Counts MESSAGES (role transitions), not individual nodes
 5. Keeps last N messages, filters to user/assistant only
-6. Returns modified Response with trimmed JSON
+6. If trimming needed, returns modified Response with trimmed JSON; otherwise returns original Response untouched
 
 ### Message-Based Counting
 
