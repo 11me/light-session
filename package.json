@@ -10,10 +10,12 @@
     "build": "node build.cjs",
     "build:firefox": "node build.cjs --target=firefox",
     "build:chrome": "node build.cjs --target=chrome",
+    "build:safari": "node build.cjs --target=safari",
     "build:types": "tsc --noEmit",
     "build:prod": "rm -f extension/.dev && NODE_ENV=production node build.cjs",
     "build:prod:firefox": "rm -f extension/.dev && NODE_ENV=production node build.cjs --target=firefox",
     "build:prod:chrome": "rm -f extension/.dev && NODE_ENV=production node build.cjs --target=chrome",
+    "build:prod:safari": "rm -f extension/.dev && NODE_ENV=production node build.cjs --target=safari",
     "watch": "node build.cjs --watch",
     "watch:chrome": "node build.cjs --target=chrome --watch",
     "lint": "eslint extension/src",
@@ -27,6 +29,7 @@
     "dev:stable": "npm run build:firefox && web-ext run --source-dir=extension --firefox=firefox --start-url='https://chat.openai.com'",
     "package": "npm run build:prod:firefox && web-ext build --source-dir=extension --artifacts-dir=web-ext-artifacts",
     "package:chrome": "npm run build:prod:chrome && cd extension && zip -r ../web-ext-artifacts/lightsession-chrome.zip . -x '*.ts' -x 'src/*' -x 'manifest.*.json'",
+    "package:safari": "npm run build:prod:safari && xcrun safari-web-extension-converter extension --project-location web-ext-artifacts/safari --app-name 'LightSession Pro' --bundle-identifier com.lightsession.pro --copy-resources --no-open",
     "clean": "rm -rf extension/dist extension/popup/popup.js web-ext-artifacts"
   },
   "keywords": [

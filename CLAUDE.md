@@ -9,6 +9,7 @@ npm install            # Install dependencies
 npm run build          # Build for Firefox (default)
 npm run build:firefox  # Build for Firefox
 npm run build:chrome   # Build for Chrome
+npm run build:safari   # Build for Safari
 npm run dev            # Run in Firefox Developer Edition
 npm run watch:chrome   # Watch mode for Chrome development
 npm run test           # Run unit tests (vitest)
@@ -16,11 +17,12 @@ npm run lint           # ESLint check
 npm run build:types    # TypeScript type check
 npm run package        # Package for Firefox (web-ext-artifacts/)
 npm run package:chrome # Package for Chrome (ZIP)
+npm run package:safari # Build for Safari + run safari-web-extension-converter (outputs to web-ext-artifacts/safari/)
 ```
 
 ## Architecture
 
-**Cross-browser extension (Manifest V3)** for Firefox and Chrome that uses Fetch Proxy to trim ChatGPT conversations before React renders.
+**Cross-browser extension (Manifest V3)** for Firefox, Chrome, and Safari that uses Fetch Proxy to trim ChatGPT conversations before React renders.
 
 ### Core Components
 
@@ -60,9 +62,10 @@ LightSession Pro counts **messages** (role changes) instead of nodes:
 
 ```
 extension/
-├── manifest.json          # Symlink → manifest.firefox.json (or chrome copy)
+├── manifest.json          # Symlink → manifest.firefox.json (or chrome/safari copy)
 ├── manifest.firefox.json  # Firefox-specific manifest
 ├── manifest.chrome.json   # Chrome-specific manifest
+├── manifest.safari.json   # Safari-specific manifest (MV3, no declarativeContent)
 └── src/
     ├── page/              # Page script (Fetch Proxy, runs in page context)
     ├── content/           # Content scripts (settings, status bar)
@@ -70,7 +73,7 @@ extension/
     ├── popup/             # Popup HTML/CSS/TS
     └── shared/            # Types, constants, storage, logger
 tests/                     # Unit tests (vitest + happy-dom)
-build.cjs                  # esbuild build script (supports --target=firefox|chrome)
+build.cjs                  # esbuild build script (supports --target=firefox|chrome|safari)
 ```
 
 ## Conventions
