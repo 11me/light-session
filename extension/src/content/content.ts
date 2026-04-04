@@ -23,6 +23,7 @@ import {
 import { isEmptyChatView } from './chat-view';
 import { installUserCollapse, type UserCollapseController } from './user-collapse';
 import { isLightSessionRejection } from './rejection-filter';
+import { isProxyReadySatisfied } from '../shared/proxy-ready';
 
 
 // ============================================================================
@@ -139,7 +140,7 @@ function handleProxyReady(): void {
  * Shows a warning in the status bar if not.
  */
 function checkProxyStatus(): void {
-  if (!proxyReady) {
+  if (!isProxyReadySatisfied(proxyReady)) {
     logWarn('Fetch proxy did not signal ready within timeout');
     // Don't show warning to user - proxy may still work, just didn't send ready message
   }

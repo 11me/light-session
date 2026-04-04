@@ -13,6 +13,7 @@ vi.mock('../../extension/src/shared/trimmer', () => ({
 }));
 
 import { trimMapping } from '../../extension/src/shared/trimmer';
+import { clearProxyReady, hasProxyReadyMarker } from '../../extension/src/shared/proxy-ready';
 
 // ============================================================================
 // Test Utilities
@@ -511,6 +512,7 @@ describe('fetch interception no-trim path (visibleKept === visibleTotal)', () =>
     vi.resetModules();
     vi.clearAllMocks();
     localStorage.clear();
+    clearProxyReady();
     delete (window as unknown as { __LS_PROXY_PATCHED__?: boolean }).__LS_PROXY_PATCHED__;
     delete (window as unknown as { __LS_CONFIG__?: unknown }).__LS_CONFIG__;
     delete (window as unknown as { __LS_DEBUG__?: boolean }).__LS_DEBUG__;
@@ -585,6 +587,30 @@ describe('fetch interception no-trim path (visibleKept === visibleTotal)', () =>
     expect(last.removed).toBe(0);
   });
 
+  it('marks the document as proxy-ready when the fetch proxy is installed', async () => {
+    localStorage.setItem('ls_config', JSON.stringify({ enabled: true, limit: 10, debug: false }));
+
+    const conversationData = createConversationData(1);
+    const nativeFetch = vi.fn(async () => createMockResponse(conversationData));
+    (globalThis as unknown as { fetch: typeof fetch }).fetch = nativeFetch;
+
+    mockedTrimMapping.mockReturnValue({
+      mapping: conversationData.mapping,
+      current_node: 'node-0',
+      root: 'node-0',
+      keptCount: 1,
+      totalCount: 1,
+      visibleKept: 1,
+      visibleTotal: 1,
+    });
+
+    expect(hasProxyReadyMarker()).toBe(false);
+
+    await import('../../extension/src/page/page-script');
+
+    expect(hasProxyReadyMarker()).toBe(true);
+  });
+
   it('returns original response when visibleKept === visibleTotal (exact limit: 5 of 5)', async () => {
     localStorage.setItem('ls_config', JSON.stringify({ enabled: true, limit: 5, debug: false }));
 
@@ -650,6 +676,7 @@ describe('config gating in fetch interception', () => {
     vi.clearAllMocks();
     localStorage.clear();
     document.body.innerHTML = '';
+    clearProxyReady();
     delete (window as unknown as { __LS_PROXY_PATCHED__?: boolean }).__LS_PROXY_PATCHED__;
     delete (window as unknown as { __LS_CONFIG__?: unknown }).__LS_CONFIG__;
     delete (window as unknown as { __LS_DEBUG__?: boolean }).__LS_DEBUG__;

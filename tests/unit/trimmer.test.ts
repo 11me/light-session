@@ -276,6 +276,52 @@ describe('trimMapping - hidden roles', () => {
     expect(result!.visibleKept).toBe(2);
     expect(result!.visibleTotal).toBe(2);
   });
+
+  it('preserves hidden nodes that belong to the kept suffix when trimming', () => {
+    const { mapping, current_node } = buildConversation([
+      null,
+      'user',
+      'thinking',
+      'tool',
+      'assistant',
+      'user',
+      'thinking',
+      'tool',
+      'assistant',
+    ]);
+    const result = trimMapping({ mapping, current_node }, 2);
+
+    expect(result).not.toBeNull();
+    expect(result!.mapping['node-5']).toBeDefined();
+    expect(result!.mapping['node-6']).toBeDefined();
+    expect(result!.mapping['node-7']).toBeDefined();
+    expect(result!.mapping['node-8']).toBeDefined();
+    expect(result!.mapping['node-0']?.children).toEqual(['node-5']);
+    expect(result!.mapping['node-5']?.children).toEqual(['node-6']);
+    expect(result!.mapping['node-6']?.children).toEqual(['node-7']);
+    expect(result!.mapping['node-7']?.children).toEqual(['node-8']);
+  });
+
+  it('keeps a hidden first node in the suffix as the root child when trimming to one visible turn', () => {
+    const { mapping, current_node } = buildConversation([
+      null,
+      'user',
+      'assistant',
+      'user',
+      'thinking',
+      'tool',
+      'assistant',
+    ]);
+    const result = trimMapping({ mapping, current_node }, 1);
+
+    expect(result).not.toBeNull();
+    expect(result!.root).toBe('node-0');
+    expect(result!.mapping['node-0']?.children).toEqual(['node-4']);
+    expect(result!.mapping['node-4']?.message?.author?.role).toBe('thinking');
+    expect(result!.mapping['node-5']?.message?.author?.role).toBe('tool');
+    expect(result!.current_node).toBe('node-6');
+    expect(result!.visibleKept).toBe(1);
+  });
 });
 
 // ============================================================================

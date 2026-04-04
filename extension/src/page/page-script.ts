@@ -18,6 +18,7 @@ import {
   trimMapping,
   type ConversationData,
 } from '../shared/trimmer';
+import { markProxyReady } from '../shared/proxy-ready';
 import type { TrimStatus } from '../shared/types';
 
 // ============================================================================
@@ -396,6 +397,7 @@ function patchFetch(): void {
 
   window.__LS_PROXY_PATCHED__ = true;
   log('Fetch proxy installed');
+  markProxyReady();
 
   // Notify content script that proxy is ready (use origin for security)
   window.postMessage({ type: 'lightsession-proxy-ready' }, location.origin);
