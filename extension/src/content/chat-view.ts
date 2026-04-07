@@ -18,6 +18,22 @@ export function hasConversationTurns(root: ParentNode): boolean {
   return false;
 }
 
+export function countConversationTurns(root: ParentNode): number {
+  const main = root.querySelector('main');
+  if (!main) {
+    return 0;
+  }
+
+  for (const selector of ['[data-message-author-role]', '[data-message-id]', '[data-testid="conversation-turn"]', 'article']) {
+    const count = main.querySelectorAll(selector).length;
+    if (count > 0) {
+      return count;
+    }
+  }
+
+  return 0;
+}
+
 export function isEmptyChatView(root: ParentNode): boolean {
   const main = root.querySelector('main');
   if (!main) {

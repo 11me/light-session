@@ -4,7 +4,11 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 
-import { hasConversationTurns, isEmptyChatView } from '../../extension/src/content/chat-view';
+import {
+  countConversationTurns,
+  hasConversationTurns,
+  isEmptyChatView,
+} from '../../extension/src/content/chat-view';
 
 describe('chat view helpers', () => {
   beforeEach(() => {
@@ -43,5 +47,25 @@ describe('chat view helpers', () => {
 
     expect(hasConversationTurns(document)).toBe(true);
     expect(isEmptyChatView(document)).toBe(false);
+  });
+
+  it('counts visible turns using author-role nodes first', () => {
+    document.body.innerHTML =
+      '<main><div data-message-author-role="user"></div><div data-message-author-role="assistant"></div></main>';
+
+    expect(countConversationTurns(document)).toBe(2);
+  });
+
+  it('falls back to message-id nodes when author-role nodes are absent', () => {
+    document.body.innerHTML =
+      '<main><div data-message-id="u1"></div><div data-message-id="a1"></div><div data-message-id="u2"></div></main>';
+
+    expect(countConversationTurns(document)).toBe(3);
+  });
+
+  it('returns zero when main has no detected turns', () => {
+    document.body.innerHTML = '<main><div>No messages</div></main>';
+
+    expect(countConversationTurns(document)).toBe(0);
   });
 });

@@ -13,6 +13,7 @@ vi.mock('../../extension/src/shared/trimmer', () => ({
 }));
 
 import { trimMapping } from '../../extension/src/shared/trimmer';
+import { clearProxyReady, hasProxyReadyMarker } from '../../extension/src/shared/proxy-ready';
 
 // ============================================================================
 // Test Utilities
@@ -74,6 +75,7 @@ function createConversationData(nodeCount: number = 4) {
   };
 }
 
+
 // ============================================================================
 // Helper Function Tests (extracted for testability)
 // ============================================================================
@@ -89,6 +91,12 @@ describe('isConversationRequest logic', () => {
     expect(isConversationRequest('GET', '/backend-api/conversation/123')).toBe(true);
     expect(isConversationRequest('GET', '/backend-api/conversation/123/')).toBe(true);
     expect(isConversationRequest('GET', '/backend-api/shared_conversation/abc-xyz')).toBe(true);
+    expect(
+      isConversationRequest(
+        'GET',
+        '/backend-api/conversation/69d40b5d-10cc-8386-85fa-1751adb7d01b'
+      )
+    ).toBe(true);
   });
 
   it('returns false for non-GET methods', () => {
@@ -111,6 +119,23 @@ describe('isConversationRequest logic', () => {
     expect(isConversationRequest('GET', '/api/conversation')).toBe(false);
     expect(isConversationRequest('GET', '/conversation')).toBe(false);
     expect(isConversationRequest('GET', '/')).toBe(false);
+  });
+});
+
+describe('extractConversationPageId logic', () => {
+  it('extracts a conversation id from chatgpt conversation pages', async () => {
+    const { extractConversationPageId } = await import('../../extension/src/shared/url');
+
+    expect(extractConversationPageId('https://chatgpt.com/c/abc123')).toBe('abc123');
+    expect(extractConversationPageId('https://chat.openai.com/c/test-id/')).toBe('test-id');
+  });
+
+  it('returns null for non-conversation pages', async () => {
+    const { extractConversationPageId } = await import('../../extension/src/shared/url');
+
+    expect(extractConversationPageId('https://chatgpt.com/')).toBeNull();
+    expect(extractConversationPageId('https://chatgpt.com/gg/abc')).toBeNull();
+    expect(extractConversationPageId('https://example.com/c/abc')).toBeNull();
   });
 });
 
@@ -511,9 +536,11 @@ describe('fetch interception no-trim path (visibleKept === visibleTotal)', () =>
     vi.resetModules();
     vi.clearAllMocks();
     localStorage.clear();
+    clearProxyReady();
     delete (window as unknown as { __LS_PROXY_PATCHED__?: boolean }).__LS_PROXY_PATCHED__;
     delete (window as unknown as { __LS_CONFIG__?: unknown }).__LS_CONFIG__;
     delete (window as unknown as { __LS_DEBUG__?: boolean }).__LS_DEBUG__;
+    delete (window as unknown as { __LS_BOOTSTRAP_SYNC_LISTENER__?: boolean }).__LS_BOOTSTRAP_SYNC_LISTENER__;
   });
 
   afterEach(() => {
@@ -585,6 +612,30 @@ describe('fetch interception no-trim path (visibleKept === visibleTotal)', () =>
     expect(last.removed).toBe(0);
   });
 
+  it('marks the document as proxy-ready when the fetch proxy is installed', async () => {
+    localStorage.setItem('ls_config', JSON.stringify({ enabled: true, limit: 10, debug: false }));
+
+    const conversationData = createConversationData(1);
+    const nativeFetch = vi.fn(async () => createMockResponse(conversationData));
+    (globalThis as unknown as { fetch: typeof fetch }).fetch = nativeFetch;
+
+    mockedTrimMapping.mockReturnValue({
+      mapping: conversationData.mapping,
+      current_node: 'node-0',
+      root: 'node-0',
+      keptCount: 1,
+      totalCount: 1,
+      visibleKept: 1,
+      visibleTotal: 1,
+    });
+
+    expect(hasProxyReadyMarker()).toBe(false);
+
+    await import('../../extension/src/page/page-script');
+
+    expect(hasProxyReadyMarker()).toBe(true);
+  });
+
   it('returns original response when visibleKept === visibleTotal (exact limit: 5 of 5)', async () => {
     localStorage.setItem('ls_config', JSON.stringify({ enabled: true, limit: 5, debug: false }));
 
@@ -650,9 +701,11 @@ describe('config gating in fetch interception', () => {
     vi.clearAllMocks();
     localStorage.clear();
     document.body.innerHTML = '';
+    clearProxyReady();
     delete (window as unknown as { __LS_PROXY_PATCHED__?: boolean }).__LS_PROXY_PATCHED__;
     delete (window as unknown as { __LS_CONFIG__?: unknown }).__LS_CONFIG__;
     delete (window as unknown as { __LS_DEBUG__?: boolean }).__LS_DEBUG__;
+    delete (window as unknown as { __LS_BOOTSTRAP_SYNC_LISTENER__?: boolean }).__LS_BOOTSTRAP_SYNC_LISTENER__;
   });
 
   it('skips trimming when config is not received', async () => {
@@ -694,4 +747,5 @@ describe('config gating in fetch interception', () => {
     expect(nativeFetch).toHaveBeenCalledTimes(1);
     expect(mockedTrimMapping).toHaveBeenCalledTimes(1);
   });
+
 });

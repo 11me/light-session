@@ -18,11 +18,14 @@ import {
   updateStatusBar,
   resetAccumulatedTrimmed,
   refreshStatusBar,
+  showBootstrapStatus,
   setStatusBarVisibility,
 } from './status-bar';
-import { isEmptyChatView } from './chat-view';
+import { countConversationTurns, isEmptyChatView } from './chat-view';
 import { installUserCollapse, type UserCollapseController } from './user-collapse';
 import { isLightSessionRejection } from './rejection-filter';
+import { isProxyReadySatisfied } from '../shared/proxy-ready';
+import { extractConversationPageId } from '../shared/url';
 
 
 // ============================================================================
@@ -60,6 +63,8 @@ let emptyChatState = false;
 let emptyChatCheckTimer: number | null = null;
 let emptyChatObserver: MutationObserver | null = null;
 let userCollapse: UserCollapseController | null = null;
+let hasAuthoritativeStatus = false;
+let requestedBootstrapSyncConversationId: string | null = null;
 
 // ============================================================================
 // Page Script Communication
@@ -110,6 +115,8 @@ function handleTrimStatus(event: CustomEvent<unknown>): void {
   }
 
   logDebug('Received trim status:', status);
+  hasAuthoritativeStatus = true;
+  requestedBootstrapSyncConversationId = extractConversationPageId(location.href);
 
   // Convert page script status format to status bar format
   updateStatusBar({
@@ -139,7 +146,7 @@ function handleProxyReady(): void {
  * Shows a warning in the status bar if not.
  */
 function checkProxyStatus(): void {
-  if (!proxyReady) {
+  if (!isProxyReadySatisfied(proxyReady)) {
     logWarn('Fetch proxy did not signal ready within timeout');
     // Don't show warning to user - proxy may still work, just didn't send ready message
   }
@@ -250,8 +257,11 @@ function setupNavigationDetection(): void {
       lastUrl = location.href;
 
       logDebug(`${source} navigation:`, lastUrl);
+      hasAuthoritativeStatus = false;
+      requestedBootstrapSyncConversationId = null;
       resetAccumulatedTrimmed();
       refreshStatusBar();
+      scheduleEmptyChatCheck();
 
       // Re-bind DOM observers for per-chat containers (SPA navigation can replace the message list DOM).
       // Make the settings intent explicit; userCollapse being non-null is an implementation detail.
@@ -301,11 +311,44 @@ function setupNavigationDetection(): void {
 
 function checkEmptyChatView(): void {
   const isEmpty = isEmptyChatView(document);
-  if (isEmpty && !emptyChatState) {
-    resetAccumulatedTrimmed();
-    refreshStatusBar();
+  if (isEmpty) {
+    if (!emptyChatState) {
+      hasAuthoritativeStatus = false;
+      resetAccumulatedTrimmed();
+      refreshStatusBar();
+    }
+    emptyChatState = true;
+    return;
   }
-  emptyChatState = isEmpty;
+
+  emptyChatState = false;
+
+  if (!currentSettings?.enabled || hasAuthoritativeStatus) {
+    return;
+  }
+
+  const conversationId = extractConversationPageId(location.href);
+  if (conversationId && conversationId !== requestedBootstrapSyncConversationId) {
+    requestedBootstrapSyncConversationId = conversationId;
+    window.dispatchEvent(
+      new CustomEvent('lightsession-bootstrap-sync', {
+        detail: JSON.stringify({ conversationId }),
+      })
+    );
+  }
+
+  const visibleTurns = countConversationTurns(document);
+  if (visibleTurns > 0 && visibleTurns <= currentSettings.keep) {
+    updateStatusBar({
+      totalMessages: visibleTurns,
+      visibleMessages: visibleTurns,
+      trimmedMessages: 0,
+      keepLastN: currentSettings.keep,
+    });
+    return;
+  }
+
+  showBootstrapStatus();
 }
 
 function scheduleEmptyChatCheck(): void {

@@ -170,14 +170,12 @@ export function trimMapping(
   }
 
   const keptRaw = path.slice(cutIndex);
-
-  // Filter to ONLY user/assistant nodes (remove system/tool that got included)
-  const kept = keptRaw.filter((id) => {
+  const keptVisible = keptRaw.filter((id) => {
     const node = mapping[id];
     return node && isVisibleMessage(node);
   });
 
-  if (kept.length === 0) {
+  if (keptVisible.length === 0) {
     return null;
   }
 
@@ -186,7 +184,12 @@ export function trimMapping(
   const originalRootNode = originalRootId ? mapping[originalRootId] : null;
   const hasOriginalRoot = originalRootId && originalRootNode && !isVisibleMessage(originalRootNode);
 
-  // Build new mapping with kept nodes + original root
+  const keptPath =
+    hasOriginalRoot && originalRootId && keptRaw[0] === originalRootId
+      ? keptRaw.slice(1)
+      : keptRaw;
+
+  // Build new mapping with kept suffix + original root
   const newMapping: ChatMapping = {};
   let turnsKept = 0;
   let prevRole: string | null = null;
@@ -196,19 +199,20 @@ export function trimMapping(
     newMapping[originalRootId] = {
       ...originalRootNode,
       parent: null,
-      children: kept[0] ? [kept[0]] : [],
+      children: keptPath[0] ? [keptPath[0]] : [],
     };
   }
 
-  // Add kept visible nodes
-  for (let i = 0; i < kept.length; i++) {
-    const id = kept[i];
+  // Add all nodes in the kept suffix, including hidden nodes that belong
+  // to the visible turns we keep. ChatGPT can depend on these for rendering.
+  for (let i = 0; i < keptPath.length; i++) {
+    const id = keptPath[i];
     if (!id) continue;
 
     // First kept node's parent is originalRoot (if exists), otherwise null
     const prevId =
-      i === 0 ? (hasOriginalRoot ? originalRootId : null) : kept[i - 1];
-    const nextId = kept[i + 1] ?? null;
+      i === 0 ? (hasOriginalRoot ? originalRootId : null) : keptPath[i - 1];
+    const nextId = keptPath[i + 1] ?? null;
     const originalNode = mapping[id];
 
     if (originalNode) {
@@ -229,8 +233,8 @@ export function trimMapping(
   const visibleKept = turnsKept;
 
   // Use original root if available, otherwise first kept node
-  const newRoot = hasOriginalRoot ? originalRootId : kept[0];
-  const newCurrentNode = kept[kept.length - 1];
+  const newRoot = hasOriginalRoot ? originalRootId : keptPath[0];
+  const newCurrentNode = keptPath[keptPath.length - 1];
 
   // These should always be defined since kept.length > 0, but TypeScript needs assurance
   if (!newRoot || !newCurrentNode) {
@@ -241,7 +245,7 @@ export function trimMapping(
     mapping: newMapping,
     current_node: newCurrentNode,
     root: newRoot,
-    keptCount: kept.length,
+    keptCount: Object.keys(newMapping).length,
     totalCount,
     visibleKept,
     visibleTotal,
