@@ -120,6 +120,11 @@ export const TIMING = {
    * - Status bar is informational, doesn't need real-time updates
    */
   STATUS_BAR_THROTTLE_MS: 500,
+
+  /**
+   * Delays before bounded authoritative-sync retries for a new chat (ms).
+   */
+  NEW_CHAT_SYNC_RETRY_DELAYS_MS: [800, 1600, 3200] as const,
 } as const;
 
 // ============================================================================

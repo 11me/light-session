@@ -7,6 +7,7 @@ import { TIMING } from '../shared/constants';
 
 const STATUS_BAR_ID = 'lightsession-status-bar';
 const WAITING_TEXT = 'LightSession · waiting for messages…';
+const PENDING_TEXT = 'LightSession · sync pending…';
 
 export interface StatusBarStats {
   totalMessages: number;
@@ -15,7 +16,7 @@ export interface StatusBarStats {
   keepLastN: number;
 }
 
-type StatusBarState = 'active' | 'waiting' | 'all-visible' | 'unrecognized';
+type StatusBarState = 'active' | 'waiting' | 'pending' | 'all-visible' | 'unrecognized';
 
 let currentStats: StatusBarStats | null = null;
 let isVisible = true;
@@ -124,6 +125,11 @@ function applyStateStyles(bar: HTMLElement, state: StatusBarState): void {
     case 'waiting':
       bar.style.color = '#9ca3af';
       break;
+    case 'pending':
+      bar.style.color = '#bfdbfe';
+      bar.style.backgroundColor = 'rgba(30, 41, 59, 0.92)';
+      bar.style.borderColor = 'rgba(96, 165, 250, 0.45)';
+      break;
     case 'all-visible':
       // Keep neutral styling
       break;
@@ -166,6 +172,12 @@ function renderStatusBar(displayStats: StatusBarStats): void {
 function renderWaitingStatusBar(bar: HTMLElement): void {
   bar.textContent = WAITING_TEXT;
   applyStateStyles(bar, 'waiting');
+  lastUpdateTime = performance.now();
+}
+
+function renderPendingStatusBar(bar: HTMLElement): void {
+  bar.textContent = PENDING_TEXT;
+  applyStateStyles(bar, 'pending');
   lastUpdateTime = performance.now();
 }
 
@@ -309,6 +321,26 @@ export function resetAccumulatedTrimmed(): void {
   }
 
   renderWaitingStatusBar(bar);
+}
+
+export function showBootstrapStatus(): void {
+  currentStats = null;
+  pendingStats = null;
+  if (pendingUpdateTimer !== null) {
+    clearTimeout(pendingUpdateTimer);
+    pendingUpdateTimer = null;
+  }
+
+  if (!isVisible) {
+    return;
+  }
+
+  const bar = getOrCreateStatusBar();
+  if (!bar) {
+    return;
+  }
+
+  renderPendingStatusBar(bar);
 }
 
 /**

@@ -7,6 +7,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TIMING } from '../../extension/src/shared/constants';
 import {
   showStatusBar,
+  showBootstrapStatus,
   updateStatusBar,
   resetAccumulatedTrimmed,
   refreshStatusBar,
@@ -14,6 +15,7 @@ import {
 } from '../../extension/src/content/status-bar';
 
 const WAITING_TEXT = 'LightSession · waiting for messages…';
+const PENDING_TEXT = 'LightSession · sync pending…';
 
 describe('status bar behavior', () => {
   beforeEach(() => {
@@ -106,5 +108,13 @@ describe('status bar behavior', () => {
     const refreshed = document.getElementById('lightsession-status-bar');
     expect(refreshed).not.toBeNull();
     expect(refreshed?.textContent).toBe('LightSession · last 2 · 2 trimmed');
+  });
+
+  it('shows pending bootstrap text before authoritative status arrives', () => {
+    showStatusBar();
+    showBootstrapStatus();
+
+    const bar = document.getElementById('lightsession-status-bar');
+    expect(bar?.textContent).toBe(PENDING_TEXT);
   });
 });

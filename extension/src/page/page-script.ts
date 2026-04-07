@@ -18,6 +18,7 @@ import {
   trimMapping,
   type ConversationData,
 } from '../shared/trimmer';
+import { TIMING } from '../shared/constants';
 import { markProxyReady } from '../shared/proxy-ready';
 import type { TrimStatus } from '../shared/types';
 
@@ -40,6 +41,7 @@ declare global {
     __LS_CONFIG__?: LsConfig;
     __LS_PROXY_PATCHED__?: boolean;
     __LS_DEBUG__?: boolean;
+    __LS_BOOTSTRAP_SYNC_LISTENER__?: boolean;
   }
 }
 
@@ -94,6 +96,8 @@ async function ensureConfigReady(timeoutMs = 50): Promise<void> {
 let configReceived = false;
 const CONFIG_FALLBACK_TIMEOUT_MS = 2000;
 const configStartTime = Date.now();
+const completedBootstrapSyncIds = new Set<string>();
+const inFlightBootstrapSyncIds = new Set<string>();
 
 /**
  * localStorage key - must match storage.ts LOCAL_STORAGE_KEY
@@ -145,6 +149,63 @@ function dispatchStatus(status: TrimStatus): void {
   window.dispatchEvent(
     new CustomEvent('lightsession-status', { detail: status })
   );
+}
+
+function extractConversationRequestId(url: URL): string | null {
+  const match = url.pathname.match(
+    /^\/backend-api\/(?:conversation|shared_conversation)\/([^/]+)\/?$/
+  );
+  return match?.[1] ?? null;
+}
+
+function looksLikeConversationData(
+  json: ConversationData | null
+): json is ConversationData & {
+  mapping: NonNullable<ConversationData['mapping']>;
+  current_node: string;
+} {
+  return !!json && typeof json === 'object' && !!json.mapping && typeof json.current_node === 'string';
+}
+
+async function attemptAuthoritativeConversationSync(conversationId: string): Promise<void> {
+  if (
+    !conversationId ||
+    completedBootstrapSyncIds.has(conversationId) ||
+    inFlightBootstrapSyncIds.has(conversationId)
+  ) {
+    return;
+  }
+
+  inFlightBootstrapSyncIds.add(conversationId);
+
+  try {
+    for (const delayMs of TIMING.NEW_CHAT_SYNC_RETRY_DELAYS_MS) {
+      await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
+
+      if (completedBootstrapSyncIds.has(conversationId)) {
+        return;
+      }
+
+      try {
+        const response = await window.fetch(
+          `/backend-api/conversation/${encodeURIComponent(conversationId)}`
+        );
+        if (!response.ok || !isJsonResponse(response)) {
+          continue;
+        }
+
+        const json = (await response.clone().json().catch(() => null)) as ConversationData | null;
+        if (looksLikeConversationData(json)) {
+          completedBootstrapSyncIds.add(conversationId);
+          return;
+        }
+      } catch (error) {
+        log('Bootstrap authoritative sync attempt failed:', error);
+      }
+    }
+  } finally {
+    inFlightBootstrapSyncIds.delete(conversationId);
+  }
 }
 
 // ============================================================================
@@ -313,8 +374,13 @@ async function interceptedFetch(
     }
 
     // Check if this looks like conversation data
-    if (!json.mapping || !json.current_node) {
+    if (!looksLikeConversationData(json)) {
       return res;
+    }
+
+    const requestConversationId = extractConversationRequestId(url);
+    if (requestConversationId) {
+      completedBootstrapSyncIds.add(requestConversationId);
     }
 
     // Trim the mapping
@@ -448,6 +514,31 @@ function setupConfigListener(): void {
   }) as EventListener);
 }
 
+function setupBootstrapSyncListener(): void {
+  if (window.__LS_BOOTSTRAP_SYNC_LISTENER__) {
+    return;
+  }
+  window.__LS_BOOTSTRAP_SYNC_LISTENER__ = true;
+
+  window.addEventListener('lightsession-bootstrap-sync', ((event: CustomEvent<string>) => {
+    if (typeof event.detail !== 'string') {
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(event.detail) as { conversationId?: string };
+      const conversationId = parsed.conversationId?.trim();
+      if (!conversationId) {
+        return;
+      }
+
+      void attemptAuthoritativeConversationSync(conversationId);
+    } catch {
+      // Ignore malformed bootstrap sync events
+    }
+  }) as EventListener);
+}
+
 // ============================================================================
 // Entry Point
 // ============================================================================
@@ -467,6 +558,7 @@ function setupConfigListener(): void {
   }
 
   setupConfigListener();
+  setupBootstrapSyncListener();
   patchFetch();
 
   log('Fetch Proxy loaded');

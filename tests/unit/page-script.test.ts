@@ -75,6 +75,7 @@ function createConversationData(nodeCount: number = 4) {
   };
 }
 
+
 // ============================================================================
 // Helper Function Tests (extracted for testability)
 // ============================================================================
@@ -90,6 +91,12 @@ describe('isConversationRequest logic', () => {
     expect(isConversationRequest('GET', '/backend-api/conversation/123')).toBe(true);
     expect(isConversationRequest('GET', '/backend-api/conversation/123/')).toBe(true);
     expect(isConversationRequest('GET', '/backend-api/shared_conversation/abc-xyz')).toBe(true);
+    expect(
+      isConversationRequest(
+        'GET',
+        '/backend-api/conversation/69d40b5d-10cc-8386-85fa-1751adb7d01b'
+      )
+    ).toBe(true);
   });
 
   it('returns false for non-GET methods', () => {
@@ -112,6 +119,23 @@ describe('isConversationRequest logic', () => {
     expect(isConversationRequest('GET', '/api/conversation')).toBe(false);
     expect(isConversationRequest('GET', '/conversation')).toBe(false);
     expect(isConversationRequest('GET', '/')).toBe(false);
+  });
+});
+
+describe('extractConversationPageId logic', () => {
+  it('extracts a conversation id from chatgpt conversation pages', async () => {
+    const { extractConversationPageId } = await import('../../extension/src/shared/url');
+
+    expect(extractConversationPageId('https://chatgpt.com/c/abc123')).toBe('abc123');
+    expect(extractConversationPageId('https://chat.openai.com/c/test-id/')).toBe('test-id');
+  });
+
+  it('returns null for non-conversation pages', async () => {
+    const { extractConversationPageId } = await import('../../extension/src/shared/url');
+
+    expect(extractConversationPageId('https://chatgpt.com/')).toBeNull();
+    expect(extractConversationPageId('https://chatgpt.com/gg/abc')).toBeNull();
+    expect(extractConversationPageId('https://example.com/c/abc')).toBeNull();
   });
 });
 
@@ -516,6 +540,7 @@ describe('fetch interception no-trim path (visibleKept === visibleTotal)', () =>
     delete (window as unknown as { __LS_PROXY_PATCHED__?: boolean }).__LS_PROXY_PATCHED__;
     delete (window as unknown as { __LS_CONFIG__?: unknown }).__LS_CONFIG__;
     delete (window as unknown as { __LS_DEBUG__?: boolean }).__LS_DEBUG__;
+    delete (window as unknown as { __LS_BOOTSTRAP_SYNC_LISTENER__?: boolean }).__LS_BOOTSTRAP_SYNC_LISTENER__;
   });
 
   afterEach(() => {
@@ -680,6 +705,7 @@ describe('config gating in fetch interception', () => {
     delete (window as unknown as { __LS_PROXY_PATCHED__?: boolean }).__LS_PROXY_PATCHED__;
     delete (window as unknown as { __LS_CONFIG__?: unknown }).__LS_CONFIG__;
     delete (window as unknown as { __LS_DEBUG__?: boolean }).__LS_DEBUG__;
+    delete (window as unknown as { __LS_BOOTSTRAP_SYNC_LISTENER__?: boolean }).__LS_BOOTSTRAP_SYNC_LISTENER__;
   });
 
   it('skips trimming when config is not received', async () => {
@@ -721,4 +747,5 @@ describe('config gating in fetch interception', () => {
     expect(nativeFetch).toHaveBeenCalledTimes(1);
     expect(mockedTrimMapping).toHaveBeenCalledTimes(1);
   });
+
 });

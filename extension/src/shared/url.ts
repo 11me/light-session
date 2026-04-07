@@ -16,3 +16,21 @@ export function isChatGptUrl(url?: string | null): boolean {
     return false;
   }
 }
+
+export function extractConversationPageId(url?: string | null): string | null {
+  if (!url) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(url);
+    if (!CHATGPT_HOSTS.has(parsed.hostname)) {
+      return null;
+    }
+
+    const match = parsed.pathname.match(/^\/c\/([^/]+)\/?$/);
+    return match?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
