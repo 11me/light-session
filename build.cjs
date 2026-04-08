@@ -7,6 +7,7 @@
  *   node build.cjs                     - Development build for Firefox (default)
  *   node build.cjs --target=firefox    - Build for Firefox
  *   node build.cjs --target=chrome     - Build for Chrome
+ *   node build.cjs --target=safari     - Build for Safari
  *   node build.cjs --watch             - Watch mode for development
  *   NODE_ENV=production node build.cjs - Production build (minified, no sourcemaps)
  */
@@ -18,10 +19,10 @@ const path = require('path');
 const isWatch = process.argv.includes('--watch');
 const isProduction = process.env.NODE_ENV === 'production';
 
-// Parse --target=firefox|chrome (default: firefox)
+// Parse --target=firefox|chrome|safari (default: firefox)
 const targetArg = process.argv.find((arg) => arg.startsWith('--target='));
 const target = targetArg ? targetArg.split('=')[1] : 'firefox';
-const validTargets = ['firefox', 'chrome'];
+const validTargets = ['firefox', 'chrome', 'safari'];
 if (!validTargets.includes(target)) {
   console.error(`❌ Invalid target: ${target}. Use: ${validTargets.join(', ')}`);
   process.exit(1);
@@ -39,8 +40,8 @@ function copyManifest() {
     fs.unlinkSync(manifestDest);
   }
 
-  if (target === 'chrome') {
-    // For Chrome, copy manifest.chrome.json
+  if (target === 'chrome' || target === 'safari') {
+    // For Chrome/Safari, copy the target-specific manifest
     fs.copyFileSync(manifestSrc, manifestDest);
     console.log(`✓ Copied manifest.${target}.json → manifest.json`);
   } else {
