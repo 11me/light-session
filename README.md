@@ -65,6 +65,28 @@ Built after too many coding sessions where a single ChatGPT tab would start eati
 
 **[Install from Chrome Web Store](https://chromewebstore.google.com/detail/lightsession-pro/cenmillohidhjjjjiocmddkgmlonaigp)**
 
+### Safari
+
+Safari support is currently available as a local temporary extension. There is no reviewed App Store release yet.
+
+For local use on macOS Safari:
+
+```bash
+git clone https://github.com/11me/light-session.git
+cd light-session
+npm install
+npm run build:safari
+```
+
+Then in Safari:
+
+1. Open **Safari > Settings > Advanced** and enable **Show features for web developers** or **Show Develop menu in menu bar**.
+2. Open **Safari > Settings > Developer** and enable **Allow unsigned extensions**.
+3. Click **Add Temporary Extension...** and select the `extension/` folder from this repo.
+4. Open the **Extensions** tab and enable LightSession.
+
+Temporary Safari extensions are for local testing/use. Safari may remove them after 24 hours or when Safari quits, so repeat the last steps after rebuilding or restarting Safari.
+
 ### After installation
 
 1. Open any ChatGPT conversation.
@@ -84,6 +106,9 @@ npm run build:firefox
 
 # Build for Chrome
 npm run build:chrome
+
+# Build for Safari
+npm run build:safari
 ```
 
 **Firefox:**
@@ -95,6 +120,12 @@ npm run build:chrome
 1. Open `chrome://extensions`
 2. Enable **Developer mode**
 3. Click **Load unpacked**
+4. Select the `extension/` folder
+
+**Safari:**
+1. Run `npm run build:safari`
+2. Open **Safari > Settings > Developer**
+3. Click **Add Temporary Extension...**
 4. Select the `extension/` folder
 
 ---
@@ -177,7 +208,7 @@ Trimming only affects what the browser renders. The conversation itself remains 
 
 - Node.js >= 24.10.0 (see `.node-version`)
 - npm >= 10
-- Firefox >= 115 or Chrome >= 120
+- Firefox >= 115, Chrome >= 120, or Safari >= 15.4
 
 ### Scripts
 
@@ -188,6 +219,7 @@ npm install              # Install dependencies
 npm run build            # Build for Firefox (default)
 npm run build:firefox    # Build for Firefox
 npm run build:chrome     # Build for Chrome
+npm run build:safari     # Build for Safari
 
 # Development
 npm run dev              # Run in Firefox Developer Edition
@@ -201,6 +233,7 @@ npm run build:types      # Type check
 # Package
 npm run package          # Package for Firefox (web-ext-artifacts/)
 npm run package:chrome   # Package for Chrome (ZIP)
+npm run package:safari   # Package for Safari with Xcode tooling (optional)
 ```
 
 ### Project structure
@@ -217,6 +250,7 @@ extension/
 ├── icons/              # Extension icons
 ├── manifest.firefox.json  # Firefox manifest (MV3)
 ├── manifest.chrome.json   # Chrome manifest (MV3)
+├── manifest.safari.json   # Safari manifest (MV3)
 └── manifest.json          # Active manifest (symlink/copy from build)
 ```
 
@@ -231,7 +265,7 @@ extension/
 
 ## 🌐 Compatibility
 
-- **Browsers:** Firefox >= 115, Chrome >= 120 (Manifest V3)
+- **Browsers:** Firefox >= 115, Chrome >= 120, Safari >= 15.4 (Manifest V3)
 - **OS:** Windows, macOS, Linux
 - **ChatGPT:** Optimized for the current UI (2025–2026), resilient to small layout changes
 
