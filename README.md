@@ -67,25 +67,7 @@ Built after too many coding sessions where a single ChatGPT tab would start eati
 
 ### Safari
 
-Safari support is currently available as a local temporary extension. There is no reviewed App Store release yet.
-
-For local use on macOS Safari:
-
-```bash
-git clone https://github.com/11me/light-session.git
-cd light-session
-npm install
-npm run build:safari
-```
-
-Then in Safari:
-
-1. Open **Safari > Settings > Advanced** and enable **Show features for web developers** or **Show Develop menu in menu bar**.
-2. Open **Safari > Settings > Developer** and enable **Allow unsigned extensions**.
-3. Click **Add Temporary Extension...** and select the `extension/` folder from this repo.
-4. Open the **Extensions** tab and enable LightSession.
-
-Temporary Safari extensions are for local testing/use. Safari may remove them after 24 hours or when Safari quits, so repeat the last steps after rebuilding or restarting Safari.
+Currently manual install only.
 
 ### After installation
 
@@ -127,6 +109,8 @@ npm run build:safari
 2. Open **Safari > Settings > Developer**
 3. Click **Add Temporary Extension...**
 4. Select the `extension/` folder
+
+Temporary Safari extensions are for local testing/use. Safari may remove them after 24 hours or when Safari quits, so repeat the last steps after rebuilding or restarting Safari.
 
 ---
 
