@@ -4,6 +4,7 @@
  * These tests ensure that manifest files are correctly configured for each browser:
  * - Firefox: requires background.scripts (array), does NOT support service_worker
  * - Chrome: requires background.service_worker (string), does NOT support scripts
+ * - Safari: requires background.service_worker (string), does NOT support scripts
  */
 
 import { describe, it, expect } from 'vitest';
@@ -12,11 +13,17 @@ import * as path from 'path';
 
 // Load manifest files
 const extensionDir = path.resolve(__dirname, '../../extension');
+const packageJson = JSON.parse(
+  fs.readFileSync(path.resolve(__dirname, '../../package.json'), 'utf-8')
+);
 const firefoxManifest = JSON.parse(
   fs.readFileSync(path.join(extensionDir, 'manifest.firefox.json'), 'utf-8')
 );
 const chromeManifest = JSON.parse(
   fs.readFileSync(path.join(extensionDir, 'manifest.chrome.json'), 'utf-8')
+);
+const safariManifest = JSON.parse(
+  fs.readFileSync(path.join(extensionDir, 'manifest.safari.json'), 'utf-8')
 );
 
 describe('Firefox manifest (manifest.firefox.json)', () => {
@@ -108,17 +115,75 @@ describe('Chrome manifest (manifest.chrome.json)', () => {
   });
 });
 
+describe('Safari manifest (manifest.safari.json)', () => {
+  it('uses manifest_version 3', () => {
+    expect(safariManifest.manifest_version).toBe(3);
+  });
+
+  it('has background.service_worker string (required for Safari MV3)', () => {
+    expect(safariManifest.background).toBeDefined();
+    expect(safariManifest.background.service_worker).toBeDefined();
+    expect(typeof safariManifest.background.service_worker).toBe('string');
+  });
+
+  it('does NOT have background.scripts (Safari MV3 uses service_worker)', () => {
+    expect(safariManifest.background.scripts).toBeUndefined();
+  });
+
+  it('has browser_specific_settings.safari', () => {
+    expect(safariManifest.browser_specific_settings).toBeDefined();
+    expect(safariManifest.browser_specific_settings.safari).toBeDefined();
+    expect(safariManifest.browser_specific_settings.safari.strict_min_version).toBe('15.4');
+  });
+
+  it('does NOT request Chrome-only declarativeContent permission', () => {
+    expect(safariManifest.permissions).not.toContain('declarativeContent');
+  });
+
+  it('has required permissions', () => {
+    expect(safariManifest.permissions).toContain('storage');
+    expect(safariManifest.permissions).toContain('tabs');
+  });
+
+  it('has host_permissions for ChatGPT domains', () => {
+    expect(safariManifest.host_permissions).toBeDefined();
+    const hosts = safariManifest.host_permissions.join(' ');
+    expect(hosts).toContain('chat.openai.com');
+    expect(hosts).toContain('chatgpt.com');
+  });
+
+  it('has content_scripts configured', () => {
+    expect(safariManifest.content_scripts).toBeDefined();
+    expect(safariManifest.content_scripts.length).toBeGreaterThan(0);
+  });
+
+  it('has web_accessible_resources with page-script.js', () => {
+    expect(safariManifest.web_accessible_resources).toBeDefined();
+    const resources = safariManifest.web_accessible_resources[0]?.resources || [];
+    expect(resources).toContain('dist/page-script.js');
+  });
+});
+
 describe('manifest consistency', () => {
-  it('both manifests have the same version', () => {
+  it('all manifests match package.json version', () => {
+    expect(firefoxManifest.version).toBe(packageJson.version);
+    expect(chromeManifest.version).toBe(packageJson.version);
+    expect(safariManifest.version).toBe(packageJson.version);
+  });
+
+  it('all manifests have the same version', () => {
     expect(firefoxManifest.version).toBe(chromeManifest.version);
+    expect(safariManifest.version).toBe(firefoxManifest.version);
   });
 
-  it('both manifests have the same name', () => {
+  it('all manifests have the same name', () => {
     expect(firefoxManifest.name).toBe(chromeManifest.name);
+    expect(safariManifest.name).toBe(firefoxManifest.name);
   });
 
-  it('both manifests have the same description', () => {
+  it('all manifests have the same description', () => {
     expect(firefoxManifest.description).toBe(chromeManifest.description);
+    expect(safariManifest.description).toBe(firefoxManifest.description);
   });
 
   it('chrome permissions include firefox permissions (plus chrome-only)', () => {
@@ -133,35 +198,46 @@ describe('manifest consistency', () => {
     expect(extraChromePerms.sort()).toEqual(['declarativeContent']);
   });
 
-  it('both manifests have the same host_permissions', () => {
-    expect(firefoxManifest.host_permissions.sort()).toEqual(
-      chromeManifest.host_permissions.sort()
+  it('safari permissions match firefox permissions', () => {
+    expect([...safariManifest.permissions].sort()).toEqual([...firefoxManifest.permissions].sort());
+  });
+
+  it('all manifests have the same host_permissions', () => {
+    expect([...firefoxManifest.host_permissions].sort()).toEqual(
+      [...chromeManifest.host_permissions].sort()
+    );
+    expect([...safariManifest.host_permissions].sort()).toEqual(
+      [...firefoxManifest.host_permissions].sort()
     );
   });
 
-  it('both manifests target the same background script', () => {
+  it('all manifests target the same background script', () => {
     const firefoxBg = firefoxManifest.background.scripts[0];
     const chromeBg = chromeManifest.background.service_worker;
+    const safariBg = safariManifest.background.service_worker;
     expect(firefoxBg).toBe(chromeBg);
+    expect(safariBg).toBe(firefoxBg);
   });
 
-  it('both manifests have the same content scripts', () => {
-    expect(firefoxManifest.content_scripts.length).toBe(
-      chromeManifest.content_scripts.length
-    );
+  it('all manifests have the same content scripts', () => {
+    expect(firefoxManifest.content_scripts.length).toBe(chromeManifest.content_scripts.length);
+    expect(safariManifest.content_scripts.length).toBe(firefoxManifest.content_scripts.length);
 
     for (let i = 0; i < firefoxManifest.content_scripts.length; i++) {
-      expect(firefoxManifest.content_scripts[i].js).toEqual(
-        chromeManifest.content_scripts[i].js
-      );
+      expect(firefoxManifest.content_scripts[i].js).toEqual(chromeManifest.content_scripts[i].js);
+      expect(safariManifest.content_scripts[i].js).toEqual(firefoxManifest.content_scripts[i].js);
       expect(firefoxManifest.content_scripts[i].run_at).toBe(
         chromeManifest.content_scripts[i].run_at
+      );
+      expect(safariManifest.content_scripts[i].run_at).toBe(
+        firefoxManifest.content_scripts[i].run_at
       );
     }
   });
 
-  it('both manifests have the same icons', () => {
+  it('all manifests have the same icons', () => {
     expect(firefoxManifest.icons).toEqual(chromeManifest.icons);
+    expect(safariManifest.icons).toEqual(firefoxManifest.icons);
   });
 });
 
@@ -173,6 +249,10 @@ describe('background script configuration details', () => {
 
   it('Chrome background.service_worker points to background.js', () => {
     expect(chromeManifest.background.service_worker).toBe('dist/background.js');
+  });
+
+  it('Safari background.service_worker points to background.js', () => {
+    expect(safariManifest.background.service_worker).toBe('dist/background.js');
   });
 
   it('Firefox does NOT have preferred_environment (removed for compatibility)', () => {
