@@ -175,6 +175,28 @@ jobs:
 
             See AMO-SOURCE-README.md in the source archive for details.
         run: |
+          set -euo pipefail
+
+          # Skip if this version was already submitted (e.g. re-running a failed job)
+          JWT=$(node -e '
+            const c = require("crypto");
+            const b64 = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
+            const now = Math.floor(Date.now() / 1000);
+            const data = b64({ alg: "HS256", typ: "JWT" }) + "." +
+              b64({ iss: process.env.WEB_EXT_API_KEY, jti: c.randomUUID(), iat: now, exp: now + 60 });
+            const sig = c.createHmac("sha256", process.env.WEB_EXT_API_SECRET).update(data).digest("base64url");
+            console.log(data + "." + sig);
+          ')
+          echo "::add-mask::$JWT"
+          ADDON_ID=$(jq -er .browser_specific_settings.gecko.id extension/manifest.firefox.json)
+          STATUS=$(curl -sS -o /dev/null -w '%{http_code}' -H "Authorization: JWT $JWT" \
+            "https://addons.mozilla.org/api/v5/addons/addon/${ADDON_ID}/versions/v${VERSION}/")
+          case "$STATUS" in
+            200) echo "Version ${VERSION} already exists on AMO, skipping"; exit 0 ;;
+            404) ;;
+            *) echo "::error::AMO version lookup failed: HTTP $STATUS"; exit 1 ;;
+          esac
+
           # Sign from the exact files in the Firefox zip (extension/ now holds the Chrome build)
           mkdir -p amo-upload
           unzip -q "light-session-${VERSION}-firefox.zip" -d amo-upload
@@ -194,48 +216,52 @@ jobs:
             --approval-timeout 0
 
       # =========================================================================
-      # Chrome Web Store Publishing
+      # Chrome Web Store Publishing (API v2)
       # =========================================================================
       - name: Publish to Chrome Web Store
         env:
           VERSION: ${{ steps.version.outputs.VERSION }}
+          PUBLISHER_ID: ${{ secrets.CHROME_PUBLISHER_ID }}
           EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
           CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
           CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
           REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
         run: |
           set -euo pipefail
-          API=https://www.googleapis.com
+          ITEM="publishers/${PUBLISHER_ID}/items/${EXTENSION_ID}"
+          API=https://chromewebstore.googleapis.com
 
-          ACCESS_TOKEN=$(curl -sSf https://oauth2.googleapis.com/token \
+          ACCESS_TOKEN=$(curl -sS --fail-with-body https://oauth2.googleapis.com/token \
             -d client_id="$CLIENT_ID" \
             -d client_secret="$CLIENT_SECRET" \
             -d refresh_token="$REFRESH_TOKEN" \
-            -d grant_type=refresh_token | jq -r .access_token)
+            -d grant_type=refresh_token | jq -er .access_token)
           echo "::add-mask::$ACCESS_TOKEN"
-          AUTH=(-H "Authorization: Bearer $ACCESS_TOKEN" -H "x-goog-api-version: 2")
+          AUTH=(-H "Authorization: Bearer $ACCESS_TOKEN")
 
-          UPLOAD=$(curl -sS "${AUTH[@]}" -X PUT \
+          RESPONSE=$(curl -sS --fail-with-body "${AUTH[@]}" -X POST \
             -T "light-session-${VERSION}-chrome.zip" \
-            "$API/upload/chromewebstore/v1.1/items/$EXTENSION_ID")
-          echo "$UPLOAD"
-          STATE=$(jq -r .uploadState <<< "$UPLOAD")
+            "$API/upload/v2/${ITEM}:upload")
+          echo "$RESPONSE"
+          STATE=$(jq -r .uploadState <<< "$RESPONSE")
 
           for _ in $(seq 1 30); do
             [ "$STATE" != "IN_PROGRESS" ] && break
             sleep 10
-            STATE=$(curl -sS "${AUTH[@]}" \
-              "$API/chromewebstore/v1.1/items/$EXTENSION_ID?projection=DRAFT" | jq -r .uploadState)
+            RESPONSE=$(curl -sS --fail-with-body "${AUTH[@]}" "$API/v2/${ITEM}:fetchStatus")
+            echo "$RESPONSE"
+            STATE=$(jq -r .lastAsyncUploadState <<< "$RESPONSE")
           done
-          if [ "$STATE" != "SUCCESS" ]; then
+          if [ "$STATE" != "SUCCEEDED" ]; then
             echo "::error::Chrome Web Store upload failed: $STATE"
             exit 1
           fi
 
-          PUBLISH=$(curl -sS "${AUTH[@]}" -X POST -H "Content-Length: 0" \
-            "$API/chromewebstore/v1.1/items/$EXTENSION_ID/publish")
-          echo "$PUBLISH"
-          if ! jq -e 'any(.status[]?; . == "OK" or . == "ITEM_PENDING_REVIEW")' <<< "$PUBLISH" > /dev/null; then
-            echo "::error::Chrome Web Store publish failed"
-            exit 1
-          fi
+          RESPONSE=$(curl -sS --fail-with-body "${AUTH[@]}" -X POST \
+            -H "Content-Type: application/json" -d '{}' \
+            "$API/v2/${ITEM}:publish")
+          echo "$RESPONSE"
+          case "$(jq -r .state <<< "$RESPONSE")" in
+            PENDING_REVIEW|STAGED|PUBLISHED|PUBLISHED_TO_TESTERS) ;;
+            *) echo "::error::Chrome Web Store publish failed"; exit 1 ;;
+          esac
