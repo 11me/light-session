@@ -16,6 +16,7 @@ export {};
 
 import {
   trimMapping,
+  trimMessages,
   type ConversationData,
 } from '../shared/trimmer';
 import { TIMING } from '../shared/constants';
@@ -153,18 +154,75 @@ function dispatchStatus(status: TrimStatus): void {
 
 function extractConversationRequestId(url: URL): string | null {
   const match = url.pathname.match(
-    /^\/backend-api\/(?:conversation|shared_conversation)\/([^/]+)\/?$/
+    /^\/backend-api\/(?:conversation|conversations|shared_conversation)\/([^/]+)\/?$/
   );
   return match?.[1] ?? null;
 }
 
-function looksLikeConversationData(
-  json: ConversationData | null
-): json is ConversationData & {
-  mapping: NonNullable<ConversationData['mapping']>;
-  current_node: string;
-} {
-  return !!json && typeof json === 'object' && !!json.mapping && typeof json.current_node === 'string';
+function looksLikeConversationData(json: ConversationData | null): json is ConversationData {
+  if (!json || typeof json !== 'object') {
+    return false;
+  }
+
+  return (!!json.mapping && typeof json.current_node === 'string') || Array.isArray(json.messages);
+}
+
+interface TrimmedConversation {
+  data: ConversationData;
+  keptCount: number;
+  totalCount: number;
+  visibleKept: number;
+  visibleTotal: number;
+}
+
+function trimConversationData(data: ConversationData, limit: number): TrimmedConversation | null {
+  if (Array.isArray(data.messages)) {
+    const trimmed = trimMessages(data, limit);
+    if (!trimmed) {
+      return null;
+    }
+
+    const firstMessageId = trimmed.messages[0]?.id;
+    const lastMessageId = trimmed.messages[trimmed.messages.length - 1]?.id;
+    const pageInfo = data.page_info;
+
+    return {
+      ...trimmed,
+      data: {
+        ...data,
+        messages: trimmed.messages,
+        ...(pageInfo
+          ? {
+              page_info: {
+                ...pageInfo,
+                ...(firstMessageId ? { start_cursor: firstMessageId } : {}),
+                ...(lastMessageId ? { end_cursor: lastMessageId } : {}),
+                // The retained suffix is intentionally the complete visible
+                // history for this session; don't invite the UI to page older
+                // records back into the DOM.
+                has_previous_page: false,
+              },
+            }
+          : {}),
+      },
+    };
+  }
+
+  const trimmed = trimMapping(data, limit);
+  if (!trimmed) {
+    return null;
+  }
+
+  return {
+    ...trimmed,
+    data: {
+      ...data,
+      mapping: trimmed.mapping,
+      current_node: trimmed.current_node,
+      // ChatGPT needs the legacy root to know where to start rendering.
+      root: trimmed.root,
+    },
+  };
 }
 
 async function attemptAuthoritativeConversationSync(conversationId: string): Promise<void> {
@@ -224,7 +282,7 @@ function getConfig(): LsConfig {
     window.__LS_CONFIG__ = stored;
     return stored;
   }
-  
+
   // Fall back to window config (set by content script events)
   const cfg = window.__LS_CONFIG__;
   if (cfg) {
@@ -235,7 +293,7 @@ function getConfig(): LsConfig {
       debug: cfg.debug ?? DEFAULT_CONFIG.debug,
     };
   }
-  
+
   return DEFAULT_CONFIG;
 }
 
@@ -248,19 +306,20 @@ function isConversationRequest(method: string, url: URL): boolean {
     return false;
   }
 
-  // Only endpoints that return the conversation tree we can trim.
+  // Only endpoints that return conversation history we can trim.
   // ChatGPT performs many GET /backend-api/* requests on load (/me, /models, /settings, etc.).
   // Intercepting those adds unnecessary overhead (clone/json) and config gating delay.
   //
   // Allowed:
   // - /backend-api/conversation/<id>
+  // - /backend-api/conversations/<id> (current paginated response)
   // - /backend-api/shared_conversation/<id> (share links)
   //
   // Explicitly excluded by pattern (extra path segments):
   // - /backend-api/conversation/<id>/stream_status
   // - /backend-api/conversation/<id>/textdocs
   const path = url.pathname;
-  return /^\/backend-api\/(conversation|shared_conversation)\/[^/]+\/?$/.test(path);
+  return /^\/backend-api\/(conversation|conversations|shared_conversation)\/[^/]+\/?$/.test(path);
 }
 
 /**
@@ -383,8 +442,8 @@ async function interceptedFetch(
       completedBootstrapSyncIds.add(requestConversationId);
     }
 
-    // Trim the mapping
-    const trimmed = trimMapping(json, cfg.limit);
+    // Trim the legacy mapping or the current flat messages response.
+    const trimmed = trimConversationData(json, cfg.limit);
 
     if (!trimmed) {
       return res;
@@ -423,17 +482,7 @@ async function interceptedFetch(
       limit: cfg.limit,
     });
 
-    // Build modified response data
-    const modifiedData: ConversationData = {
-      ...json,
-      mapping: trimmed.mapping,
-      current_node: trimmed.current_node,
-    };
-
-    // Always set root - ChatGPT needs this to know where to start rendering
-    modifiedData.root = trimmed.root;
-
-    return createModifiedResponse(res, modifiedData);
+    return createModifiedResponse(res, trimmed.data);
   } catch (error) {
     // On any error, return original response
     log('Error in fetch interceptor:', error);

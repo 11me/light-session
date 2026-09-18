@@ -8,10 +8,13 @@
 import { describe, it, expect } from 'vitest';
 import {
   trimMapping,
+  trimMessages,
   isVisibleMessage,
+  isVisibleConversationMessage,
   HIDDEN_ROLES,
   type ChatNode,
   type ChatMapping,
+  type ConversationMessage,
   type ConversationData,
 } from '../../extension/src/shared/trimmer';
 
@@ -104,6 +107,16 @@ describe('isVisibleMessage', () => {
   it('returns false for node with undefined role', () => {
     const node: ChatNode = { parent: null, message: { author: {} } };
     expect(isVisibleMessage(node)).toBe(false);
+  });
+});
+
+describe('isVisibleConversationMessage', () => {
+  it('uses the same visible-role rules for flat messages', () => {
+    const user: ConversationMessage = { id: 'user', author: { role: 'user' } };
+    const tool: ConversationMessage = { id: 'tool', author: { role: 'tool' } };
+
+    expect(isVisibleConversationMessage(user)).toBe(true);
+    expect(isVisibleConversationMessage(tool)).toBe(false);
   });
 });
 
@@ -487,5 +500,54 @@ describe('trimMapping - mapping structure', () => {
     expect(result).not.toBeNull();
     expect(result!.mapping['node-0']?.message?.author?.role).toBe('user');
     expect(result!.mapping['node-1']?.message?.author?.role).toBe('assistant');
+  });
+});
+
+// ============================================================================
+// trimMessages() Tests - Current flat response shape
+// ============================================================================
+
+describe('trimMessages - flat conversation responses', () => {
+  const message = (id: string, role: string): ConversationMessage => ({
+    id,
+    author: { role },
+    content: { content_type: 'text' },
+  });
+
+  it('keeps the last N role-transition turns and updates their count', () => {
+    const messages = [
+      message('system-1', 'system'),
+      message('user-1', 'user'),
+      message('assistant-1', 'assistant'),
+      message('user-2', 'user'),
+      message('assistant-2', 'assistant'),
+    ];
+
+    const result = trimMessages({ messages, current_node: 'assistant-2' }, 2);
+
+    expect(result?.messages.map((entry) => entry.id)).toEqual(['user-2', 'assistant-2']);
+    expect(result?.visibleTotal).toBe(4);
+    expect(result?.visibleKept).toBe(2);
+  });
+
+  it('retains hidden records in the kept suffix', () => {
+    const messages = [
+      message('user-1', 'user'),
+      message('assistant-1', 'assistant'),
+      message('tool-1', 'tool'),
+      message('user-2', 'user'),
+      message('assistant-2', 'assistant'),
+    ];
+
+    const result = trimMessages({ messages, current_node: 'assistant-2' }, 2);
+
+    expect(result?.messages.map((entry) => entry.id)).toEqual(['tool-1', 'user-2', 'assistant-2']);
+    expect(result?.keptCount).toBe(3);
+  });
+
+  it('returns null when there are no visible messages', () => {
+    expect(
+      trimMessages({ messages: [message('system-1', 'system'), message('tool-1', 'tool')] }, 2)
+    ).toBeNull();
   });
 });
