@@ -15,6 +15,23 @@ export interface ChatMessage {
   };
 }
 
+/**
+ * Current conversation responses use a flat, chronological messages array
+ * rather than the legacy mapping tree. Keep this deliberately permissive:
+ * ChatGPT adds message metadata frequently, and trimming must preserve it.
+ */
+export interface ConversationMessage extends ChatMessage {
+  id?: string;
+  [key: string]: unknown;
+}
+
+export interface ConversationPageInfo {
+  start_cursor?: string;
+  end_cursor?: string;
+  has_previous_page?: boolean;
+  [key: string]: unknown;
+}
+
 export interface ChatNode {
   parent: string | null;
   children?: string[];
@@ -29,12 +46,22 @@ export interface ConversationData {
   mapping?: ChatMapping;
   current_node?: string;
   root?: string;
+  messages?: ConversationMessage[];
+  page_info?: ConversationPageInfo;
 }
 
 export interface TrimResult {
   mapping: ChatMapping;
   current_node: string;
   root: string;
+  keptCount: number;
+  totalCount: number;
+  visibleKept: number;
+  visibleTotal: number;
+}
+
+export interface MessagesTrimResult {
+  messages: ConversationMessage[];
   keptCount: number;
   totalCount: number;
   visibleKept: number;
@@ -65,11 +92,19 @@ export const HIDDEN_ROLES = new Set([
  * Nodes without messages (like root nodes) are not visible.
  */
 export function isVisibleMessage(node: ChatNode): boolean {
-  const role = node.message?.author?.role;
-  // Must have a role to be considered a message
-  if (!role) return false;
-  // Exclude hidden/internal roles
-  return !HIDDEN_ROLES.has(role);
+  return isVisibleRole(node.message?.author?.role);
+}
+
+/**
+ * Check whether an item in the modern flat messages array is visible.
+ */
+export function isVisibleConversationMessage(message: ConversationMessage): boolean {
+  return isVisibleRole(message.author?.role);
+}
+
+function isVisibleRole(role: string | undefined): boolean {
+  // Must have a role to be considered a message.
+  return !!role && !HIDDEN_ROLES.has(role);
 }
 
 // ============================================================================
@@ -247,6 +282,88 @@ export function trimMapping(
     root: newRoot,
     keptCount: Object.keys(newMapping).length,
     totalCount,
+    visibleKept,
+    visibleTotal,
+  };
+}
+
+/**
+ * Trim a modern flat conversation response to its last N visible turns.
+ *
+ * The current /backend-api/conversations/<id> response contains a
+ * chronological messages array instead of the legacy mapping tree. We retain
+ * the same role-transition semantics as trimMapping() and preserve hidden
+ * records that occur within the retained suffix (for example tool output
+ * between a user prompt and its final assistant answer).
+ */
+export function trimMessages(data: ConversationData, limit: number): MessagesTrimResult | null {
+  const messages = data.messages;
+  if (!Array.isArray(messages)) {
+    return null;
+  }
+
+  const effectiveLimit = Math.max(1, limit);
+  let visibleTotal = 0;
+  let lastVisibleRole: string | null = null;
+
+  for (const message of messages) {
+    if (!isVisibleConversationMessage(message)) {
+      continue;
+    }
+
+    const role = message.author?.role ?? '';
+    if (role !== lastVisibleRole) {
+      visibleTotal++;
+      lastVisibleRole = role;
+    }
+  }
+
+  if (visibleTotal === 0) {
+    return null;
+  }
+
+  let turnCount = 0;
+  let cutIndex = 0;
+  let lastRole: string | null = null;
+
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i];
+    if (!message || !isVisibleConversationMessage(message)) {
+      continue;
+    }
+
+    const role = message.author?.role ?? '';
+    if (role !== lastRole) {
+      turnCount++;
+      lastRole = role;
+    }
+
+    if (turnCount > effectiveLimit) {
+      cutIndex = i + 1;
+      break;
+    }
+  }
+
+  const keptMessages = messages.slice(cutIndex);
+  let visibleKept = 0;
+  let lastKeptRole: string | null = null;
+
+  for (const message of keptMessages) {
+    if (!isVisibleConversationMessage(message)) {
+      continue;
+    }
+
+    const role = message.author?.role ?? '';
+    if (role !== lastKeptRole) {
+      visibleKept++;
+      lastKeptRole = role;
+    }
+  }
+
+  return {
+    messages: keptMessages,
+    keptCount: keptMessages.length,
+    totalCount: messages.length,
     visibleKept,
     visibleTotal,
   };

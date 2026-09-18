@@ -7,12 +7,13 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// Mock trimMapping module before importing page-script internals
+// Mock trimmer module before importing page-script internals
 vi.mock('../../extension/src/shared/trimmer', () => ({
   trimMapping: vi.fn(),
+  trimMessages: vi.fn(),
 }));
 
-import { trimMapping } from '../../extension/src/shared/trimmer';
+import { trimMapping, trimMessages } from '../../extension/src/shared/trimmer';
 import { clearProxyReady, hasProxyReadyMarker } from '../../extension/src/shared/proxy-ready';
 
 // ============================================================================
@@ -84,12 +85,13 @@ describe('isConversationRequest logic', () => {
   // Testing the logic that would be in isConversationRequest
   const isConversationRequest = (method: string, pathname: string): boolean => {
     if (method !== 'GET') return false;
-    return /^\/backend-api\/(conversation|shared_conversation)\/[^/]+\/?$/.test(pathname);
+    return /^\/backend-api\/(conversation|conversations|shared_conversation)\/[^/]+\/?$/.test(pathname);
   };
 
   it('returns true only for conversation endpoints', () => {
     expect(isConversationRequest('GET', '/backend-api/conversation/123')).toBe(true);
     expect(isConversationRequest('GET', '/backend-api/conversation/123/')).toBe(true);
+    expect(isConversationRequest('GET', '/backend-api/conversations/current-chat')).toBe(true);
     expect(isConversationRequest('GET', '/backend-api/shared_conversation/abc-xyz')).toBe(true);
     expect(
       isConversationRequest(
@@ -113,6 +115,7 @@ describe('isConversationRequest logic', () => {
     expect(isConversationRequest('GET', '/backend-api/models')).toBe(false);
     expect(isConversationRequest('GET', '/backend-api/conversation/123/stream_status')).toBe(false);
     expect(isConversationRequest('GET', '/backend-api/conversation/123/textdocs')).toBe(false);
+    expect(isConversationRequest('GET', '/backend-api/conversations/123/messages')).toBe(false);
   });
 
   it('returns false for non-backend-api paths', () => {
@@ -260,6 +263,71 @@ describe('fetch interception with trimMapping', () => {
     expect(totalBefore).toBe(8);
     expect(keptAfter).toBe(3);
     expect(removed).toBe(5);
+  });
+});
+
+describe('fetch interception with flat messages', () => {
+  const mockedTrimMessages = vi.mocked(trimMessages);
+
+  beforeEach(() => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    localStorage.clear();
+    clearProxyReady();
+    delete (window as unknown as { __LS_PROXY_PATCHED__?: boolean }).__LS_PROXY_PATCHED__;
+    delete (window as unknown as { __LS_CONFIG__?: unknown }).__LS_CONFIG__;
+    delete (window as unknown as { __LS_DEBUG__?: boolean }).__LS_DEBUG__;
+    delete (window as unknown as { __LS_BOOTSTRAP_SYNC_LISTENER__?: boolean }).__LS_BOOTSTRAP_SYNC_LISTENER__;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('trims the current plural conversations endpoint and keeps page metadata coherent', async () => {
+    localStorage.setItem('ls_config', JSON.stringify({ enabled: true, limit: 2, debug: false }));
+
+    const conversationData = {
+      current_node: 'assistant-2',
+      messages: [
+        { id: 'user-1', author: { role: 'user' } },
+        { id: 'assistant-1', author: { role: 'assistant' } },
+        { id: 'user-2', author: { role: 'user' } },
+        { id: 'assistant-2', author: { role: 'assistant' } },
+      ],
+      page_info: {
+        start_cursor: 'user-1',
+        end_cursor: 'assistant-2',
+        has_previous_page: true,
+      },
+    };
+    const nativeFetch = vi.fn(async () => createMockResponse(conversationData));
+    (globalThis as unknown as { fetch: typeof fetch }).fetch = nativeFetch;
+
+    mockedTrimMessages.mockReturnValue({
+      messages: conversationData.messages.slice(2),
+      keptCount: 2,
+      totalCount: 4,
+      visibleKept: 2,
+      visibleTotal: 4,
+    });
+
+    await import('../../extension/src/page/page-script');
+    const response = await window.fetch(
+      'https://chatgpt.com/backend-api/conversations/current-chat?num_turns=10'
+    );
+    const body = await response.json();
+
+    expect(mockedTrimMessages).toHaveBeenCalledWith(conversationData, 2);
+    expect(body.messages.map((entry: { id: string }) => entry.id)).toEqual([
+      'user-2',
+      'assistant-2',
+    ]);
+    expect(body.page_info).toMatchObject({
+      start_cursor: 'user-2',
+      end_cursor: 'assistant-2',
+      has_previous_page: false,
+    });
   });
 });
 

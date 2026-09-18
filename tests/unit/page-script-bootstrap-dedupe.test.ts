@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../../extension/src/shared/trimmer', () => ({
   trimMapping: vi.fn(),
+  trimMessages: vi.fn(),
 }));
 
 import { trimMapping } from '../../extension/src/shared/trimmer';
